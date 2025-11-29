@@ -156,6 +156,14 @@ export default function App() {
   const [showNotification, setShowNotification] = useState(null);
   const [activeOverlay, setActiveOverlay] = useState(null);
   
+  // --- Disclaimer State ---
+  const [showDisclaimer, setShowDisclaimer] = useState(() => {
+    try {
+      const accepted = localStorage.getItem('disclaimerAccepted');
+      return accepted !== 'true';
+    } catch { return true; }
+  });
+  
   // --- Dark Mode State ---
   const [darkMode, setDarkMode] = useState(() => {
     try {
@@ -343,6 +351,11 @@ export default function App() {
   const shareApp = () => {
     navigator.clipboard.writeText("Încearcă BioSync Pro! Am început să mă simt excelent.");
     triggerNotification("Link Copiat", "Trimite-l unui prieten care are nevoie.", "success");
+  };
+
+  const acceptDisclaimer = () => {
+    localStorage.setItem('disclaimerAccepted', 'true');
+    setShowDisclaimer(false);
   };
 
   const handleLogin = (e) => {
@@ -1152,6 +1165,48 @@ export default function App() {
 
   return (
     <div className={`min-h-screen bg-slate-50 dark:bg-black font-sans text-slate-900 dark:text-neutral-100 flex flex-col md:flex-row transition-colors duration-300`}>
+      
+      {/* Disclaimer Modal */}
+      {showDisclaimer && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="max-w-lg w-full bg-white dark:bg-neutral-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-neutral-800">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4">
+                <Heart className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Bun venit în BioSync Pro!</h2>
+              <p className="text-slate-500 dark:text-neutral-400 text-sm">Creat cu pasiune de Cristian Puravu</p>
+            </div>
+            
+            <div className="bg-slate-50 dark:bg-neutral-800 rounded-xl p-4 mb-6 text-sm text-slate-600 dark:text-neutral-300 space-y-3">
+              <p>
+                <strong className="text-slate-800 dark:text-white">📋 Disclaimer Important:</strong>
+              </p>
+              <p>
+                Această aplicație este creată în scop educațional și de uz personal. Informațiile oferite <strong>nu constituie sfaturi medicale, nutriționale sau psihologice</strong> profesionale.
+              </p>
+              <p>
+                Consultă întotdeauna un specialist calificat înainte de a face schimbări semnificative în stilul tău de viață, dietă sau rutină de sănătate.
+              </p>
+              <p>
+                Utilizarea aplicației se face pe propria răspundere. Creatorul nu își asumă responsabilitatea pentru deciziile luate pe baza informațiilor prezentate.
+              </p>
+            </div>
+            
+            <button 
+              onClick={acceptDisclaimer}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition shadow-lg flex items-center justify-center gap-2"
+            >
+              <CheckCircle className="w-5 h-5" /> Am înțeles, continuă
+            </button>
+            
+            <p className="text-center text-xs text-slate-400 dark:text-neutral-500 mt-4">
+              © {new Date().getFullYear()} Cristian Puravu. Toate drepturile rezervate.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Desktop */}
       <nav className="bg-white dark:bg-black border-r border-slate-200 dark:border-neutral-800 w-20 lg:w-64 h-screen fixed hidden md:flex flex-col z-50 shadow-sm transition-colors duration-300">
         <div className="p-6">
@@ -1204,6 +1259,22 @@ export default function App() {
             {activeTab === 'profile' && renderProfile()}
             {activeTab === 'knowledge' && renderKnowledge()}
             {activeTab === 'ai-coach' && renderAICoach()}
+            
+            {/* Footer */}
+            <footer className="mt-16 mb-24 md:mb-8 py-8 border-t border-slate-200 dark:border-neutral-800 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex items-center gap-2 text-slate-400 dark:text-neutral-500 text-sm">
+                  <Heart className="w-4 h-4 text-rose-400 fill-rose-400" />
+                  <span>Creat cu pasiune de <strong className="text-slate-600 dark:text-neutral-300">Cristian Puravu</strong></span>
+                </div>
+                <p className="text-xs text-slate-400 dark:text-neutral-600">
+                  © {new Date().getFullYear()} BioSync Pro. Toate drepturile rezervate.
+                </p>
+                <p className="text-xs text-slate-400 dark:text-neutral-600 max-w-md">
+                  Informațiile din această aplicație sunt în scop educațional și nu înlocuiesc sfatul medical profesional.
+                </p>
+              </div>
+            </footer>
         </div>
       </main>
     </div>
