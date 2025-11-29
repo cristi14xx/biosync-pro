@@ -1,106 +1,234 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Activity, CheckCircle, Sun, Smile, Zap, Send, Sparkles, Loader, Moon, 
-  BookOpen, Wine, Target, Plus, ArrowRight, User, LogOut, ShieldCheck,
-  Wind, Heart, Share2, Trash2, Settings, Droplets, Calendar, Clock, Book,
-  Timer, Play, Pause, RotateCcw, Volume2, Utensils, Flame, X, Edit3, Gift,
-  Medal, Mail, Lock, Eye, EyeOff, AlertCircle
+  Activity, 
+  Brain, 
+  Info, 
+  CheckCircle, 
+  Sun, 
+  Smile, 
+  Zap, 
+  Send, 
+  Sparkles, 
+  Loader, 
+  Moon, 
+  BookOpen, 
+  Leaf, 
+  Wine, 
+  Target, 
+  Plus, 
+  ArrowRight, 
+  User, 
+  LogOut, 
+  ChevronRight, 
+  ShieldCheck, 
+  Trophy,
+  Wind,
+  Heart,
+  Share2,
+  Camera,
+  Trash2,
+  Settings,
+  Droplets,
+  Calendar,
+  Clock,
+  Book,
+  Timer,
+  Play,
+  Pause,
+  RotateCcw,
+  Volume2,
+  Utensils,
+  Flame,
+  X,
+  Edit3,
+  Gift,
+  Medal,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle
 } from 'lucide-react';
 
+// Firebase imports
 import { auth, db } from './firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
-import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
+// --- API Key Configuration (uses environment variable) ---
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 
+// --- Funcție Helper pentru Gemini API ---
 const callGeminiAPI = async (prompt, systemInstruction = "") => {
-  if (!apiKey) return "⚠️ API key lipsește.";
+  if (!apiKey) return "⚠️ Cheia API lipsește. Configurează VITE_GEMINI_API_KEY.";
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: systemInstruction }] } }) }
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] }
+        }),
+      }
     );
     if (!response.ok) throw new Error('API Error');
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Eroare.";
-  } catch (error) { return "Nu pot accesa AI-ul momentan."; }
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Eroare la generare.";
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    return "Momentan nu pot accesa serverul AI.";
+  }
 };
 
+// --- Baza de Date Studii ---
 const knowledgeBase = {
   somn: [
-    { title: 'Ciclurile REM', content: 'Somnul REM este crucial pentru stabilitate emoțională.' },
-    { title: 'Temperatura Optimă', content: '18.3°C este temperatura ideală în dormitor.' },
-    { title: 'Regula 10-3-2-1', content: 'Fără cofeină cu 10h înainte, fără mâncare cu 3h, fără muncă cu 2h, fără ecrane cu 1h.' },
+    { title: 'Ciclurile REM', content: 'Somnul REM este crucial pentru stabilitate emoțională. Lipsa lui crește reactivitatea amigdalei cu 60%. (Matthew Walker)' },
+    { title: 'Temperatura Optimă', content: '18.3°C este temperatura ideală în dormitor. Corpul trebuie să își scadă temperatura centrală cu 1°C pentru a iniția somnul.' },
+    { title: 'Regula 10-3-2-1', content: 'Fără cofeină cu 10h înainte de culcare, fără mâncare cu 3h înainte, fără muncă cu 2h înainte, fără ecrane cu 1h înainte.' },
+    { title: 'Lumina de Dimineață', content: 'Expunerea la soare în primele 30-60 min după trezire setează ceasul circadian și ajută la eliberarea melatoninei cu 16 ore mai târziu. (Huberman Lab)' },
+    { title: 'NSDR', content: 'Non-Sleep Deep Rest (sau Yoga Nidra) timp de 20 minute poate reface dopamina din ganglionii bazali și reduce oboseala la fel de eficient ca un pui de somn.' }
   ],
   nutritie: [
-    { title: 'Glucoza și Energia', content: 'Ordinea mâncării: Fibre -> Proteine -> Carbohidrați reduce vârful glicemic cu 73%.' },
-    { title: 'Hidratarea', content: 'Deshidratarea de 2% scade performanța cognitivă.' },
+    { title: 'Glucoza și Energia', content: 'Ordinea mâncării contează: Fibre -> Proteine/Grăsimi -> Carbohidrați. Asta reduce vârful glicemic cu până la 73%. (Glucose Goddess)' },
+    { title: 'Fereastra de Alimentare', content: 'Mâncatul într-o fereastră de 8-10 ore (Time Restricted Feeding) îmbunătățește sănătatea metabolică și activează genele longevității.' },
+    { title: 'Hidratarea și Creierul', content: 'O deshidratare de doar 2% scade performanța cognitivă și memoria de scurtă durată. Apa cu puțină sare dimineața ajută la absorbție.' },
+    { title: 'Microbiomul', content: '95% din serotonină este produsă în intestin. Consumul de alimente fermentate (kefir, murături) scade inflamația sistemică.' }
   ],
   focus: [
-    { title: 'Deep Work', content: 'Multitasking-ul scade IQ-ul temporar cu 10 puncte.' },
-    { title: 'Regula 90 minute', content: 'După un ciclu de focus, ai nevoie de 20 min odihnă.' },
+    { title: 'Deep Work', content: 'Capacitatea de concentrare profundă este rară. Multitasking-ul scade IQ-ul temporar cu 10 puncte, echivalentul unei nopți nedormite. (Cal Newport)' },
+    { title: 'Regula celor 90 minute', content: 'Creierul funcționează în cicluri ultradiene de 90 minute. După un ciclu de focus intens, ai nevoie de 20 minute de odihnă.' },
+    { title: 'Binaural Beats', content: 'Sunetele de 40Hz pot îmbunătăți concentrarea și memoria de lucru prin sincronizarea undelor cerebrale.' },
+    { title: 'Dopamine Detox', content: 'Reducerea stimulilor ieftini (social media, zahăr) resetează receptorii de dopamină, făcând munca grea să pară mai ușoară.' }
+  ],
+  fericire: [
+    { title: 'Paradoxul Hedonic', content: 'Fericirea derivată din confort dispare rapid. Fericirea derivată din sens și conexiune (Eudaimonia) este durabilă.' },
+    { title: 'Recunoștința', content: 'Notarea a 3 lucruri pozitive zilnic timp de 21 de zile rescrie tiparele neuronale spre optimism. (Shawn Achor)' },
+    { title: 'Conexiunea Socială', content: 'Singurătatea cronică este echivalentă cu fumatul a 15 țigări pe zi din punct de vedere al riscului de mortalitate.' },
+    { title: 'Voluntariatul', content: '"Helper\'s High" este real. Actele de bunătate eliberează oxitocină și reduc stresul.' }
+  ],
+  longevitate: [
+    { title: 'Hormesis', content: 'Stresul scurt și controlat (duș rece, saună, exerciții intense) activează mecanismele de reparare celulară și longevitate.' },
+    { title: 'VO2 Max', content: 'Cel mai puternic predictor al longevității. Creșterea VO2 Max prin antrenamente cardio intense reduce riscul de mortalitate din toate cauzele.' },
+    { title: 'Grip Strength', content: 'Forța de prindere a mâinii este direct corelată cu sănătatea sistemului nervos și longevitatea funcțională la bătrânețe.' }
+  ],
+  ergonomie: [
+    { title: 'Regula 20-20-20', content: 'La fiecare 20 min, privește la 20 picioare (6m) distanță timp de 20 secunde pentru a preveni miopia și oboseala oculară.' },
+    { title: 'Statul pe Scaun', content: 'Statul jos prelungit dezactivează enzima LPL (care arde grăsimi). Ridică-te 2 minute la fiecare oră.' },
+    { title: 'Tech Neck', content: 'Capul aplecat la 60 de grade (uitatul în telefon) pune o presiune de 27 kg pe coloana cervicală.' }
   ]
 };
 
-const Card = ({ children, className = "" }) => (
-  <div className={`bg-white dark:bg-neutral-950 rounded-2xl shadow-sm border border-slate-100 dark:border-neutral-800 p-6 ${className}`}>{children}</div>
+// --- Componente UI ---
+const Card = ({ children, className = "", onClick, noPadding }) => (
+  <div onClick={onClick} className={`bg-white dark:bg-neutral-950 rounded-2xl shadow-sm border border-slate-100 dark:border-neutral-800 ${noPadding ? '' : 'p-6'} ${className}`}>
+    {children}
+  </div>
 );
 
 const CircularProgress = ({ score, size = 24 }) => {
   const radius = size * 1.5;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (score / 100) * circumference;
-  let color = score >= 90 ? "text-emerald-500" : score > 70 ? "text-blue-500" : score > 40 ? "text-amber-500" : "text-rose-500";
+  
+  let color = "text-rose-500";
+  if(score > 40) color = "text-amber-500";
+  if(score > 70) color = "text-blue-500";
+  if(score >= 90) color = "text-emerald-500";
+
   return (
-    <div style={{ width: size*4, height: size*4 }} className="flex items-center justify-center">
-      <svg className="transform -rotate-90 w-full h-full">
+    <div className={`relative w-${size * 4}px h-${size * 4}px flex items-center justify-center`} style={{ width: size*4, height: size*4 }}>
+      <svg className={`transform -rotate-90 w-full h-full`}>
         <circle cx="50%" cy="50%" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" className="text-slate-200 dark:text-neutral-800" />
-        <circle cx="50%" cy="50%" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" className={`${color} transition-all duration-1000`} />
+        <circle 
+          cx="50%" cy="50%" r={radius} 
+          stroke="currentColor" strokeWidth="6" fill="transparent" 
+          strokeDasharray={circumference} 
+          strokeDashoffset={strokeDashoffset} 
+          strokeLinecap="round"
+          className={`${color} transition-all duration-1000 ease-out`} 
+        />
       </svg>
     </div>
   );
 };
 
+// --- Default User Data for Firebase ---
 const getDefaultUserData = () => ({
-  profile: { name: "", age: 0 },
-  waterIntake: 0, waterGoal: 2500, waterDate: new Date().toDateString(),
-  mood: null, moodDate: new Date().toDateString(),
-  dailyHabits: { sleep: false, nature: false, reading: false, alcohol: false },
+  profile: { name: "", age: 0, bio: "Biohacker în devenire" },
+  waterIntake: 0,
+  waterGoal: 2500,
+  waterDate: new Date().toDateString(),
+  breaksTaken: 0,
+  breaksTakenDate: new Date().toDateString(),
+  mood: null,
+  moodDate: new Date().toDateString(),
+  dailyHabits: { sleep: false, nature: false, reading: false, gratitude: false, meditation: false },
   dailyHabitsDate: new Date().toDateString(),
   customHabits: [],
   challengeConfig: { name: "", reward: "", isConfigured: false },
   challengeProgress: Array(30).fill(false),
   journalHistory: [],
-  darkMode: false, disclaimerAccepted: false
+  darkMode: false,
+  disclaimerAccepted: false
 });
 
 export default function App() {
+  // --- Firebase Auth State ---
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authMode, setAuthMode] = useState('login');
   const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // --- User Data from Firebase ---
   const [userData, setUserData] = useState(getDefaultUserData());
   const [dataLoading, setDataLoading] = useState(true);
+
+  // --- App State ---
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNotification, setShowNotification] = useState(null);
   const [activeOverlay, setActiveOverlay] = useState(null);
+  
+  // --- Disclaimer State ---
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+  
+  // --- Dark Mode State ---
   const [darkMode, setDarkMode] = useState(false);
+
+  // Obiective & Scor
   const [score, setScore] = useState(0);
-  const [focusTime, setFocusTime] = useState(25 * 60);
+  const [lastBreak, setLastBreak] = useState(Date.now()); 
+
+  // Local-only states (not synced)
+  const [newHabit, setNewHabit] = useState({ what: "", when: "", where: "" });
+
+  // Focus Zone
+  const [focusTime, setFocusTime] = useState(25 * 60); 
   const [isFocusActive, setIsFocusActive] = useState(false);
-  const [activeSound, setActiveSound] = useState(null);
+  const [activeSound, setActiveSound] = useState(null); 
+
+  // Nutrition AI
   const [ingredientsInput, setIngredientsInput] = useState("");
   const [generatedMeal, setGeneratedMeal] = useState(null);
   const [isMealLoading, setIsMealLoading] = useState(false);
+
+  // Mindfulness State
   const [isBreathing, setIsBreathing] = useState(false);
-  const [breathingPhase, setBreathingPhase] = useState('Start');
-  const [breathingScale, setBreathingScale] = useState('scale-90');
-  const [breathingDuration, setBreathingDuration] = useState('duration-[4000ms]');
+  const [breathingPhase, setBreathingPhase] = useState('Inspiră');
+  const [breathingScale, setBreathingScale] = useState('scale-90'); 
+  const [breathingDuration, setBreathingDuration] = useState('duration-[4000ms]'); 
   const [gratitudeLog, setGratitudeLog] = useState(["", "", ""]);
-  const [newHabit, setNewHabit] = useState({ what: "", when: "" });
+
+  // AI & Chat
   const [generatedRoutine, setGeneratedRoutine] = useState(null);
   const [isGeneratingRoutine, setIsGeneratingRoutine] = useState(false);
   const [routineMood, setRoutineMood] = useState('Obosit');
@@ -109,27 +237,50 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef(null);
 
+  // --- Firebase Auth Listener ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setAuthLoading(false);
-      if (!user) { setUserData(getDefaultUserData()); setDataLoading(false); }
+      if (!user) {
+        setUserData(getDefaultUserData());
+        setDataLoading(false);
+      }
     });
     return () => unsubscribe();
   }, []);
 
+  // --- Load User Data from Firestore ---
   useEffect(() => {
     if (!currentUser) return;
+
     setDataLoading(true);
     const userDocRef = doc(db, 'users', currentUser.uid);
+    
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const today = new Date().toDateString();
         const newData = { ...data };
-        if (data.waterDate !== today) { newData.waterIntake = 0; newData.waterDate = today; }
-        if (data.dailyHabitsDate !== today) { newData.dailyHabits = { sleep: false, nature: false, reading: false, alcohol: false }; newData.dailyHabitsDate = today; }
-        if (data.moodDate !== today) { newData.mood = null; newData.moodDate = today; }
+        
+        // Reset daily data if new day
+        if (data.waterDate !== today) {
+          newData.waterIntake = 0;
+          newData.waterDate = today;
+        }
+        if (data.dailyHabitsDate !== today) {
+          newData.dailyHabits = { sleep: false, nature: false, reading: false, gratitude: false, meditation: false };
+          newData.dailyHabitsDate = today;
+        }
+        if (data.moodDate !== today) {
+          newData.mood = null;
+          newData.moodDate = today;
+        }
+        if (data.breaksTakenDate !== today) {
+          newData.breaksTaken = 0;
+          newData.breaksTakenDate = today;
+        }
+        
         setUserData(newData);
         setDarkMode(data.darkMode || false);
         setShowDisclaimer(!data.disclaimerAccepted);
@@ -142,423 +293,1236 @@ export default function App() {
       }
       setDataLoading(false);
     });
+
     return () => unsubscribe();
   }, [currentUser]);
 
+  // --- Save User Data to Firestore ---
   const saveUserData = async (newData) => {
     if (!currentUser) return;
-    const userDocRef = doc(db, 'users', currentUser.uid);
-    await setDoc(userDocRef, newData, { merge: true });
+    try {
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      await setDoc(userDocRef, newData, { merge: true });
+    } catch (error) {
+      console.error("Error saving data:", error);
+    }
   };
 
-  useEffect(() => { document.documentElement.classList.toggle('dark', darkMode); }, [darkMode]);
+  // --- Effects ---
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   useEffect(() => {
     let interval;
-    if (isFocusActive && focusTime > 0) { interval = setInterval(() => setFocusTime(t => t - 1), 1000); }
-    else if (focusTime === 0) { setIsFocusActive(false); triggerNotification("Sesiune Completă", "Ai terminat!", "success"); }
+    if (isFocusActive && focusTime > 0) {
+        interval = setInterval(() => {
+            setFocusTime(t => t - 1);
+        }, 1000);
+    } else if (focusTime === 0) {
+        setIsFocusActive(false);
+        triggerNotification("Sesiune Completă", "Ai terminat sesiunea de focus!", "success");
+        if (activeSound) setActiveSound(null); 
+    }
     return () => clearInterval(interval);
   }, [isFocusActive, focusTime]);
 
+  // Breathing Logic
   useEffect(() => {
-    let interval, phaseTimeout;
+    let interval;
+    let phaseTimeout;
+
     if (isBreathing) {
       const runCycle = () => {
-        setBreathingPhase('Inspiră'); setBreathingScale('scale-125'); setBreathingDuration('duration-[4000ms]');
+        setBreathingPhase('Inspiră');
+        setBreathingScale('scale-125');
+        setBreathingDuration('duration-[4000ms]');
+
         phaseTimeout = setTimeout(() => {
-          setBreathingPhase('Ține'); setBreathingDuration('duration-[7000ms]');
-          phaseTimeout = setTimeout(() => { setBreathingPhase('Expiră'); setBreathingScale('scale-90'); setBreathingDuration('duration-[8000ms]'); }, 7000);
-        }, 4000);
+          setBreathingPhase('Ține');
+          setBreathingScale('scale-125');
+          setBreathingDuration('duration-[7000ms]'); 
+
+          phaseTimeout = setTimeout(() => {
+            setBreathingPhase('Expiră');
+            setBreathingScale('scale-90');
+            setBreathingDuration('duration-[8000ms]');
+          }, 7000); 
+        }, 4000); 
       };
-      runCycle();
-      interval = setInterval(runCycle, 19100);
-    } else { setBreathingPhase('Start'); setBreathingScale('scale-90'); }
-    return () => { clearInterval(interval); clearTimeout(phaseTimeout); };
+
+      runCycle(); 
+      interval = setInterval(runCycle, 19100); 
+
+    } else {
+      setBreathingPhase('Start');
+      setBreathingScale('scale-90');
+      setBreathingDuration('duration-[4000ms]');
+      clearTimeout(phaseTimeout);
+    }
+    return () => {
+      clearInterval(interval);
+      clearTimeout(phaseTimeout);
+    };
   }, [isBreathing]);
 
+  // Scor Logic
   useEffect(() => {
     let newScore = 0;
-    newScore += Math.min((userData.waterIntake / userData.waterGoal) * 25, 25);
-    Object.values(userData.dailyHabits).forEach(val => { if(val) newScore += 15; });
-    if(userData.mood !== null) newScore += 15;
+    newScore += Math.min((userData.waterIntake / userData.waterGoal) * 20, 20);
+    newScore += Math.min((userData.breaksTaken || 0) * 5, 20);
+    Object.values(userData.dailyHabits).forEach(val => { if(val) newScore += 10; });
+    if(userData.mood !== null) newScore += 10;
     setScore(Math.round(Math.min(newScore, 100)));
   }, [userData]);
 
-  const formatTime = (s) => `${Math.floor(s/60)}:${s%60 < 10 ? '0' : ''}${s%60}`;
-  const triggerNotification = (title, message, type = 'info') => { setShowNotification({ title, message, type }); setTimeout(() => setShowNotification(null), 4000); };
+  // --- Helpers ---
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const triggerNotification = (title, message, type = 'info') => {
+    setShowNotification({ title, message, type });
+    setTimeout(() => setShowNotification(null), 5000);
+  };
 
   const toggleHabit = (key) => {
     const newHabits = { ...userData.dailyHabits, [key]: !userData.dailyHabits[key] };
     const newData = { ...userData, dailyHabits: newHabits, dailyHabitsDate: new Date().toDateString() };
-    setUserData(newData); saveUserData(newData);
+    setUserData(newData);
+    saveUserData(newData);
   };
 
   const addWater = (amount) => {
     const newData = { ...userData, waterIntake: userData.waterIntake + amount, waterDate: new Date().toDateString() };
-    setUserData(newData); saveUserData(newData);
+    setUserData(newData);
+    saveUserData(newData);
   };
 
   const setMoodValue = (val) => {
     const newData = { ...userData, mood: val, moodDate: new Date().toDateString() };
-    setUserData(newData); saveUserData(newData);
+    setUserData(newData);
+    saveUserData(newData);
   };
 
   const addCustomHabit = () => {
     if (newHabit.what && newHabit.when) {
-      const newData = { ...userData, customHabits: [...userData.customHabits, { ...newHabit, id: Date.now() }] };
-      setUserData(newData); saveUserData(newData);
-      setNewHabit({ what: "", when: "" });
+      const newHabits = [...userData.customHabits, { ...newHabit, id: Date.now(), completed: false }];
+      const newData = { ...userData, customHabits: newHabits };
+      setUserData(newData);
+      saveUserData(newData);
+      setNewHabit({ what: "", when: "", where: "" });
       triggerNotification("Protocol Salvat", "Sincronizat în cloud!", "success");
     }
   };
 
   const removeHabit = (id) => {
-    const newData = { ...userData, customHabits: userData.customHabits.filter(h => h.id !== id) };
-    setUserData(newData); saveUserData(newData);
+    const newHabits = userData.customHabits.filter(h => h.id !== id);
+    const newData = { ...userData, customHabits: newHabits };
+    setUserData(newData);
+    saveUserData(newData);
   };
 
-  const updateChallenge = (config, progress) => {
-    const newData = { ...userData };
-    if (config !== undefined) newData.challengeConfig = config;
-    if (progress !== undefined) newData.challengeProgress = progress;
-    setUserData(newData); saveUserData(newData);
+  const updateChallengeConfig = (config) => {
+    const newData = { ...userData, challengeConfig: config };
+    setUserData(newData);
+    saveUserData(newData);
+  };
+
+  const updateChallengeProgress = (progress) => {
+    const newData = { ...userData, challengeProgress: progress };
+    setUserData(newData);
+    saveUserData(newData);
   };
 
   const saveJournalEntry = () => {
-    if (gratitudeLog.some(e => e.trim())) {
-      const newEntry = { id: Date.now(), date: new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }), time: new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }), entries: gratitudeLog.filter(e => e.trim()) };
-      const newData = { ...userData, journalHistory: [newEntry, ...userData.journalHistory] };
-      setUserData(newData); saveUserData(newData);
-      setGratitudeLog(["", "", ""]);
-      triggerNotification("Salvat în Cloud", "Jurnalul tău e în siguranță!", "success");
+    if (gratitudeLog.some(entry => entry.trim() !== "")) {
+        const newEntry = {
+            id: Date.now(),
+            date: new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+            time: new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+            entries: gratitudeLog.filter(e => e.trim() !== "")
+        };
+        const newHistory = [newEntry, ...userData.journalHistory];
+        const newData = { ...userData, journalHistory: newHistory };
+        setUserData(newData);
+        saveUserData(newData);
+        setGratitudeLog(["", "", ""]); 
+        triggerNotification("Jurnal Actualizat", "Salvat în cloud!", "success");
+    } else {
+        triggerNotification("Jurnal Gol", "Scrie măcar un lucru pentru care ești recunoscător.", "info");
     }
   };
 
-  const toggleDarkMode = () => {
-    const newData = { ...userData, darkMode: !darkMode };
-    setDarkMode(!darkMode); setUserData(newData); saveUserData(newData);
+  const shareApp = () => {
+    navigator.clipboard.writeText("Încearcă BioSync Pro! Am început să mă simt excelent.");
+    triggerNotification("Link Copiat", "Trimite-l unui prieten care are nevoie.", "success");
   };
 
   const acceptDisclaimer = () => {
     const newData = { ...userData, disclaimerAccepted: true };
-    setShowDisclaimer(false); setUserData(newData); saveUserData(newData);
+    setShowDisclaimer(false);
+    setUserData(newData);
+    saveUserData(newData);
   };
 
+  const toggleDarkMode = () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    const newData = { ...userData, darkMode: newDarkMode };
+    setUserData(newData);
+    saveUserData(newData);
+  };
+
+  // --- Firebase Auth Handlers ---
   const handleRegister = async (e) => {
-    e.preventDefault(); setAuthError('');
+    e.preventDefault();
+    setAuthError('');
     const formData = new FormData(e.target);
-    const email = formData.get('email'), password = formData.get('password'), name = formData.get('name'), age = parseInt(formData.get('age')) || 30;
+    const email = formData.get('email');
+    const password = formData.get('password');
+    const name = formData.get('name');
+    const age = parseInt(formData.get('age')) || 30;
+
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(cred.user, { displayName: name });
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(userCredential.user, { displayName: name });
+      
       const initialData = getDefaultUserData();
-      initialData.profile = { name, age };
+      initialData.profile = { name, age, bio: "Biohacker în devenire" };
       initialData.waterGoal = age > 55 ? 2200 : 2500;
-      await setDoc(doc(db, 'users', cred.user.uid), initialData);
-      triggerNotification(`Bun venit, ${name}!`, "Cont creat cu succes.", "success");
+      
+      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      await setDoc(userDocRef, initialData);
+      
+      triggerNotification(`Bun venit, ${name}!`, "Contul tău a fost creat cu succes.", "success");
     } catch (error) {
-      setAuthError(error.code === 'auth/email-already-in-use' ? 'Email deja folosit.' : error.code === 'auth/weak-password' ? 'Parolă prea scurtă (min 6 caractere).' : 'Eroare la înregistrare.');
+      console.error("Register error:", error);
+      if (error.code === 'auth/email-already-in-use') {
+        setAuthError('Acest email este deja folosit.');
+      } else if (error.code === 'auth/weak-password') {
+        setAuthError('Parola trebuie să aibă minim 6 caractere.');
+      } else {
+        setAuthError('Eroare la înregistrare. Încearcă din nou.');
+      }
     }
   };
 
   const handleLogin = async (e) => {
-    e.preventDefault(); setAuthError('');
+    e.preventDefault();
+    setAuthError('');
     const formData = new FormData(e.target);
+    const email = formData.get('email');
+    const password = formData.get('password');
+
     try {
-      await signInWithEmailAndPassword(auth, formData.get('email'), formData.get('password'));
+      await signInWithEmailAndPassword(auth, email, password);
       triggerNotification("Bun venit înapoi!", "Datele tale sunt sincronizate.", "success");
-    } catch (error) { setAuthError('Email sau parolă incorectă.'); }
+    } catch (error) {
+      console.error("Login error:", error);
+      setAuthError('Email sau parolă incorectă.');
+    }
   };
 
-  const handleLogout = async () => { await signOut(auth); triggerNotification("Deconectat", "Pe curând!", "info"); };
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      triggerNotification("Deconectat", "Ne vedem curând!", "info");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
+  // AI & Generators
   const generateMealPlan = async () => {
-    if(!ingredientsInput.trim()) return;
-    setIsMealLoading(true);
-    const result = await callGeminiAPI(`Am: ${ingredientsInput}. Dă-mi o rețetă sănătoasă, scurtă.`, "Ești chef nutriționist.");
-    setGeneratedMeal(result); setIsMealLoading(false);
+      if(!ingredientsInput.trim()) return;
+      setIsMealLoading(true);
+      const prompt = `Am în frigider: ${ingredientsInput}. Generează o rețetă sănătoasă, rapidă, bogată în nutrienți pentru creier. Format scurt.`;
+      const result = await callGeminiAPI(prompt, "Ești un chef nutriționist de top.");
+      setGeneratedMeal(result);
+      setIsMealLoading(false);
   };
 
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
-    const msg = chatInput; setChatInput('');
+    const msg = chatInput;
+    setChatInput('');
     setChatHistory(prev => [...prev, { role: 'user', content: msg }]);
     setIsTyping(true);
-    const response = await callGeminiAPI(msg, `Ești BioSync AI, vorbești cu ${userData.profile?.name || 'utilizatorul'}. Fii empatic și pozitiv.`);
+    const response = await callGeminiAPI(msg, `Ești BioSync AI. Vorbești cu ${userData.profile?.name || 'utilizatorul'}. Fii empatic, înțelept și pozitiv.`);
     setChatHistory(prev => [...prev, { role: 'ai', content: response }]);
     setIsTyping(false);
   };
 
   const generateRoutine = async () => {
     setIsGeneratingRoutine(true);
-    const response = await callGeminiAPI(`Rutină de 3 minute pentru: ${routineMood}. Scurt.`);
-    setGeneratedRoutine(response); setIsGeneratingRoutine(false);
+    const prompt = `Generează o rutină de 3 minute pentru: ${routineMood}. Format simplu.`;
+    const response = await callGeminiAPI(prompt);
+    setGeneratedRoutine(response);
+    setIsGeneratingRoutine(false);
   };
 
-  // AUTH SCREEN
-  if (authLoading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader className="w-8 h-8 text-indigo-400 animate-spin"/></div>;
-  
-  if (!currentUser) return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-neutral-900 border border-white/10 rounded-2xl p-8 text-white">
+  // --- Auth Screen ---
+  const renderAuthScreen = () => (
+    <div className="min-h-screen bg-black flex items-center justify-center p-4 font-sans relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1519681393784-d120267933ba')] bg-cover opacity-10"></div>
+      <div className="max-w-md w-full bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8 animate-fade-in relative z-10 text-white">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full mx-auto flex items-center justify-center shadow-lg mb-6 animate-pulse"><Activity className="w-10 h-10"/></div>
+          <div className="w-20 h-20 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/50 mb-6 animate-pulse">
+            <Activity className="w-10 h-10 text-white" />
+          </div>
           <h1 className="text-4xl font-bold mb-2">BioSync Pro</h1>
-          <p className="text-neutral-400">Contul tău, progresul tău.</p>
+          <p className="text-neutral-400">Arhitectura vieții tale ideale.</p>
         </div>
+        
         <div className="flex bg-neutral-800 rounded-xl p-1 mb-6">
-          <button onClick={() => { setAuthMode('login'); setAuthError(''); }} className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${authMode === 'login' ? 'bg-indigo-600' : 'text-neutral-400'}`}>Autentificare</button>
-          <button onClick={() => { setAuthMode('register'); setAuthError(''); }} className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${authMode === 'register' ? 'bg-indigo-600' : 'text-neutral-400'}`}>Cont Nou</button>
+          <button 
+            onClick={() => { setAuthMode('login'); setAuthError(''); }}
+            className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${authMode === 'login' ? 'bg-indigo-600 text-white' : 'text-neutral-400'}`}
+          >
+            Autentificare
+          </button>
+          <button 
+            onClick={() => { setAuthMode('register'); setAuthError(''); }}
+            className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${authMode === 'register' ? 'bg-indigo-600 text-white' : 'text-neutral-400'}`}
+          >
+            Cont Nou
+          </button>
         </div>
-        {authError && <div className="bg-red-500/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-xl mb-4 flex items-center gap-2 text-sm"><AlertCircle className="w-4 h-4"/>{authError}</div>}
+
+        {authError && (
+          <div className="bg-red-500/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-xl mb-4 flex items-center gap-2 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0"/>
+            {authError}
+          </div>
+        )}
+        
         <form onSubmit={authMode === 'login' ? handleLogin : handleRegister} className="space-y-4">
-          {authMode === 'register' && (<><div><label className="block text-sm text-neutral-300 mb-1">Numele tău</label><div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"/><input required name="name" placeholder="Alex" className="w-full pl-12 pr-4 py-4 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-neutral-500"/></div></div><div><label className="block text-sm text-neutral-300 mb-1">Vârsta</label><input required name="age" type="number" placeholder="30" className="w-full p-4 bg-neutral-800 border border-neutral-700 rounded-xl text-white"/></div></>)}
-          <div><label className="block text-sm text-neutral-300 mb-1">Email</label><div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"/><input required name="email" type="email" placeholder="email@exemplu.com" className="w-full pl-12 pr-4 py-4 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-neutral-500"/></div></div>
-          <div><label className="block text-sm text-neutral-300 mb-1">Parolă</label><div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"/><input required name="password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="w-full pl-12 pr-12 py-4 bg-neutral-800 border border-neutral-700 rounded-xl text-white"/><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500">{showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}</button></div></div>
-          <button type="submit" className="w-full bg-white text-indigo-900 font-bold py-4 rounded-xl hover:bg-neutral-200 transition flex items-center justify-center gap-2">{authMode === 'login' ? 'Intră în cont' : 'Creează cont'} <ArrowRight className="w-5 h-5"/></button>
+          {authMode === 'register' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-1">Numele tău</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"/>
+                  <input required name="name" type="text" placeholder="ex: Alex" className="w-full pl-12 pr-4 py-4 bg-neutral-800 border border-neutral-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition text-white placeholder-neutral-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-1">Vârsta</label>
+                <input required name="age" type="number" placeholder="ex: 30" className="w-full p-4 bg-neutral-800 border border-neutral-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition text-white placeholder-neutral-500" />
+              </div>
+            </>
+          )}
+          
+          <div>
+            <label className="block text-sm font-medium text-neutral-300 mb-1">Email</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"/>
+              <input required name="email" type="email" placeholder="email@exemplu.com" className="w-full pl-12 pr-4 py-4 bg-neutral-800 border border-neutral-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition text-white placeholder-neutral-500" />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-neutral-300 mb-1">Parolă</label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"/>
+              <input required name="password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="w-full pl-12 pr-12 py-4 bg-neutral-800 border border-neutral-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition text-white placeholder-neutral-500" />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition">
+                {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+              </button>
+            </div>
+          </div>
+          
+          <button type="submit" className="w-full bg-white text-indigo-900 font-bold py-4 rounded-xl hover:bg-neutral-200 transition shadow-lg flex items-center justify-center gap-2 mt-4">
+            {authMode === 'login' ? 'Intră în cont' : 'Creează cont'} <ArrowRight className="w-5 h-5" />
+          </button>
         </form>
-        <p className="text-center text-xs text-neutral-500 mt-6">© {new Date().getFullYear()} Cristian Puravu</p>
+        
+        <p className="text-center text-xs text-neutral-500 mt-6">
+          © {new Date().getFullYear()} Cristian Puravu. Toate drepturile rezervate.
+        </p>
       </div>
     </div>
   );
 
-  if (dataLoading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader className="w-8 h-8 text-indigo-400 animate-spin"/><p className="text-neutral-400 ml-3">Se încarcă...</p></div>;
+  // --- Views ---
 
-  // MAIN APP
+  const renderDashboard = () => (
+    <div className="space-y-8 animate-fade-in pb-24 md:pb-0">
+      {/* Protocol Overlay */}
+      {activeOverlay && (
+          <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+              <div className="max-w-md w-full bg-neutral-900 border border-white/10 rounded-3xl p-8 relative">
+                  <button onClick={() => setActiveOverlay(null)} className="absolute top-4 right-4 p-2 bg-neutral-800 rounded-full text-white hover:bg-neutral-700"><X className="w-5 h-5"/></button>
+                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                      {activeOverlay === 'morning' ? <Sun className="text-amber-400"/> : <Moon className="text-indigo-400"/>}
+                      {activeOverlay === 'morning' ? 'Start Zi' : 'Închidere Zi'}
+                  </h2>
+                  <div className="space-y-4">
+                      {(activeOverlay === 'morning' 
+                        ? ['Bea 500ml apă', 'Vezi lumina naturală', 'Fă patul', 'Planifică top 3 sarcini'] 
+                        : ['Închide ecranele', 'Pregătește hainele', 'Jurnal recunoștință', 'Setează alarma']
+                      ).map((task, idx) => (
+                          <div key={idx} className="flex items-center gap-4 p-4 bg-neutral-800 rounded-xl cursor-pointer hover:bg-neutral-750 transition group" onClick={(e) => {
+                              e.currentTarget.classList.toggle('opacity-50');
+                              e.currentTarget.querySelector('.check-icon').classList.toggle('hidden');
+                          }}>
+                              <div className="w-6 h-6 border-2 border-white/30 rounded-full flex items-center justify-center">
+                                  <CheckCircle className="check-icon w-4 h-4 text-emerald-400 hidden"/>
+                              </div>
+                              <span className="text-white text-lg">{task}</span>
+                          </div>
+                      ))}
+                  </div>
+                  <button onClick={() => { setActiveOverlay(null); triggerNotification("Protocol Complet", "Excelent!", "success"); }} className="w-full mt-8 bg-white text-black font-bold py-3 rounded-xl hover:bg-neutral-200">Finalizează</button>
+              </div>
+          </div>
+      )}
+
+      {/* Hero Section */}
+      <div className="relative rounded-3xl overflow-hidden bg-black text-white shadow-2xl border border-neutral-800">
+         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+         <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600 rounded-full blur-[80px] opacity-10 translate-y-1/2 -translate-x-1/2"></div>
+         
+         <div className="relative z-10 p-8 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div>
+                <div className="flex items-center gap-4 mb-4">
+                    {['😞', '😐', '🙂', '🤩'].map((m, idx) => (
+                        <button key={idx} onClick={() => setMoodValue(idx)} className={`text-2xl hover:scale-125 transition ${mood === idx ? 'scale-125 drop-shadow-glow' : 'opacity-50'}`}>{m}</button>
+                    ))}
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white">Salut, {userData.profile?.name || 'Oaspete'}!</h1>
+                
+                <div className="flex gap-3 mt-4 mb-6">
+                    <button onClick={() => setActiveOverlay('morning')} className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-amber-500/30 transition">
+                        <Sun className="w-4 h-4"/> Start Zi
+                    </button>
+                    <button onClick={() => setActiveOverlay('evening')} className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-500/30 transition">
+                        <Moon className="w-4 h-4"/> Închidere
+                    </button>
+                </div>
+
+                <div className="flex gap-4">
+                    <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
+                        <Droplets className="w-4 h-4 text-blue-400"/>
+                        <span className="font-bold text-neutral-200">{userData.waterIntake} / {userData.waterGoal} ml</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
+                        <Zap className="w-4 h-4 text-amber-400"/>
+                        <span className="font-bold text-neutral-200">{score} / 100 Puncte</span>
+                    </div>
+                </div>
+            </div>
+            <div className="relative">
+                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl font-bold text-white">{score}</span>
+                <CircularProgress score={score} size={32} />
+            </div>
+         </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+            <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-xl flex items-center gap-2">
+                <Target className="w-6 h-6 text-indigo-600 dark:text-indigo-400"/> Laborator de Obiceiuri
+            </h3>
+            
+            <Card className="border-l-4 border-l-indigo-500 bg-slate-50 dark:bg-black dark:border-neutral-800 p-6">
+                <div className="space-y-5">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 dark:text-neutral-500 uppercase mb-2 block tracking-wide">
+                            Comportament nou (Voi face...)
+                        </label>
+                        <div className="flex items-center bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-500 transition shadow-sm">
+                            <Zap className="w-5 h-5 text-indigo-500 mr-3 flex-shrink-0"/>
+                            <input 
+                                value={newHabit.what}
+                                onChange={(e) => setNewHabit({...newHabit, what: e.target.value})}
+                                placeholder="ex: Voi citi 10 minute din cartea preferată" 
+                                className="w-full outline-none text-sm font-medium bg-transparent dark:text-neutral-100 placeholder-slate-400 dark:placeholder-neutral-600"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 dark:text-neutral-500 uppercase mb-2 block tracking-wide">
+                                Momentul (La ora / După...)
+                            </label>
+                            <div className="flex items-center bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-indigo-500 transition shadow-sm">
+                                <Activity className="w-5 h-5 text-amber-500 mr-3 flex-shrink-0"/>
+                                <input 
+                                    value={newHabit.when}
+                                    onChange={(e) => setNewHabit({...newHabit, when: e.target.value})}
+                                    placeholder="ex: imediat după cafeaua de dimineață" 
+                                    className="w-full outline-none text-sm font-medium bg-transparent dark:text-neutral-100 placeholder-slate-400 dark:placeholder-neutral-600"
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-end">
+                             <button 
+                                onClick={addCustomHabit}
+                                className="w-full bg-slate-800 dark:bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-900 dark:hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-lg hover:shadow-indigo-500/20"
+                            >
+                                <Plus className="w-5 h-5"/> Activează Protocol
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+
+            <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-xl mt-8 flex items-center gap-2">
+                <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400"/> Protocoale Esențiale
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 {[
+                        { id: 'sleep', label: 'Somn 7-8h', sub: 'Refacere Neurală', icon: Moon, color: 'indigo' },
+                        { id: 'nature', label: 'Lumină Solară', sub: 'Setare Circadiană', icon: Sun, color: 'amber' },
+                        { id: 'reading', label: 'Deep Work', sub: 'Focus 45 min', icon: BookOpen, color: 'emerald' },
+                        { id: 'alcohol', label: 'Zero Toxine', sub: 'Fără Alcool', icon: Wine, color: 'rose' },
+                 ].map(item => (
+                    <div key={item.id} onClick={() => toggleHabit(item.id)} 
+                        className={`p-4 rounded-2xl border flex items-center gap-4 cursor-pointer transition-all hover:scale-[1.02] ${
+                        userData.dailyHabits[item.id] 
+                        ? `bg-${item.color}-50 dark:bg-neutral-900 border-${item.color}-200 dark:border-${item.color}-900/50 shadow-sm` 
+                        : 'bg-white dark:bg-neutral-950 border-slate-100 dark:border-neutral-800 hover:shadow-md dark:hover:border-neutral-700'
+                        }`}>
+                        <div className={`p-3 rounded-xl ${userData.dailyHabits[item.id] ? `bg-${item.color}-100 dark:bg-${item.color}-900/30 text-${item.color}-700 dark:text-${item.color}-400` : 'bg-slate-50 dark:bg-neutral-900 text-slate-400 dark:text-neutral-500'}`}>
+                            <item.icon className="w-6 h-6"/>
+                        </div>
+                        <div className="flex-1">
+                            <div className={`font-bold ${userData.dailyHabits[item.id] ? `text-${item.color}-900 dark:text-${item.color}-100` : 'text-slate-700 dark:text-neutral-300'}`}>{item.label}</div>
+                            <div className="text-xs text-slate-400 dark:text-neutral-500 uppercase tracking-wide font-medium">{item.sub}</div>
+                        </div>
+                        {userData.dailyHabits[item.id] && <CheckCircle className={`w-6 h-6 text-${item.color}-500 animate-bounce-in`}/>}
+                    </div>
+                 ))}
+            </div>
+        </div>
+
+        <div className="space-y-6">
+             <Card className="bg-gradient-to-b from-indigo-600 to-indigo-800 dark:from-indigo-950 dark:to-black text-white border-none shadow-xl dark:border dark:border-indigo-900/30">
+                <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="w-5 h-5 text-yellow-300"/>
+                    <h3 className="font-bold">AI Coach Instant</h3>
+                </div>
+                <p className="text-indigo-100 dark:text-neutral-400 text-sm mb-6 opacity-90">Simți un blocaj? Lasă inteligența artificială să îți reseteze starea în 3 minute.</p>
+                
+                {!generatedRoutine ? (
+                    <div className="space-y-3">
+                        <select 
+                            value={routineMood} 
+                            onChange={(e) => setRoutineMood(e.target.value)}
+                            className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-sm outline-none text-white cursor-pointer hover:bg-white/20 transition dark:bg-neutral-900 dark:border-neutral-800"
+                        >
+                            <option value="Obosit" className="text-black dark:text-white dark:bg-neutral-900">⚡ Am nevoie de energie</option>
+                            <option value="Stresat" className="text-black dark:text-white dark:bg-neutral-900">🧘 Vreau să mă calmez</option>
+                            <option value="Dureri de spate" className="text-black dark:text-white dark:bg-neutral-900">🦴 Mă doare spatele</option>
+                            <option value="Lipsit de concentrare" className="text-black dark:text-white dark:bg-neutral-900">🎯 Vreau focus</option>
+                        </select>
+                        <button 
+                            onClick={generateRoutine}
+                            disabled={isGeneratingRoutine}
+                            className="w-full bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white font-bold py-3 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-700 transition flex justify-center items-center gap-2 shadow-lg"
+                        >
+                            {isGeneratingRoutine ? <Loader className="w-4 h-4 animate-spin"/> : 'Generează Rutina'}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="bg-white/10 rounded-xl p-4 backdrop-blur-md border border-white/10 animate-fade-in">
+                        <div className="prose prose-sm text-white whitespace-pre-line text-sm mb-4 font-medium leading-relaxed">
+                            {generatedRoutine}
+                        </div>
+                        <button onClick={() => setGeneratedRoutine(null)} className="w-full py-2 text-xs bg-white/10 hover:bg-white/20 rounded-lg transition text-white">Închide</button>
+                    </div>
+                )}
+            </Card>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderFocus = () => (
+      <div className="max-w-xl mx-auto text-center space-y-8 animate-fade-in py-10">
+          <h2 className="text-3xl font-bold text-slate-800 dark:text-white">Zona de Focus Zen</h2>
+          
+          <Card className="flex flex-col items-center justify-center p-12 bg-neutral-900 border-neutral-800 relative overflow-hidden">
+              <div className="absolute inset-0 bg-indigo-500/5 animate-pulse-slow"></div>
+              <div className="relative z-10 text-6xl font-mono font-bold text-white mb-8 tracking-wider">
+                  {formatTime(focusTime)}
+              </div>
+              <div className="flex gap-4 relative z-10">
+                  <button onClick={() => setIsFocusActive(!isFocusActive)} className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center hover:bg-indigo-500 transition shadow-lg shadow-indigo-500/30">
+                      {isFocusActive ? <Pause className="w-8 h-8 text-white"/> : <Play className="w-8 h-8 text-white ml-1"/>}
+                  </button>
+                  <button onClick={() => { setIsFocusActive(false); setFocusTime(25*60); }} className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center hover:bg-neutral-700 transition">
+                      <RotateCcw className="w-6 h-6 text-neutral-400"/>
+                  </button>
+              </div>
+              <div className="mt-12 flex gap-4">
+                  {['rain', 'forest', 'white'].map(sound => (
+                      <button key={sound} onClick={() => setActiveSound(sound === activeSound ? null : sound)} className={`px-4 py-2 rounded-full border text-sm font-medium transition flex items-center gap-2 ${activeSound === sound ? 'bg-indigo-900/50 border-indigo-500 text-indigo-300' : 'bg-transparent border-neutral-700 text-neutral-500'}`}>
+                          <Volume2 className="w-4 h-4"/> {sound.charAt(0).toUpperCase() + sound.slice(1)}
+                          {activeSound === sound && <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>}
+                      </button>
+                  ))}
+              </div>
+          </Card>
+      </div>
+  );
+
+  const renderNutrition = () => (
+      <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
+          <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Nutriție & Energie</h1>
+              <p className="text-slate-500 dark:text-neutral-400">Combustibil pentru performanță mentală.</p>
+          </div>
+          <Card className="bg-gradient-to-r from-emerald-900 to-teal-900 text-white border-none relative overflow-hidden">
+              <div className="relative z-10 flex flex-col md:flex-row gap-6 items-center">
+                  <div className="flex-1">
+                      <h2 className="text-2xl font-bold mb-2 flex items-center gap-2"><Utensils className="w-6 h-6"/> Chef AI</h2>
+                      <p className="text-emerald-100 mb-4 text-sm">Spune-mi ce ingrediente ai, iar eu îți voi genera o rețetă optimizată pentru creier.</p>
+                      <div className="flex gap-2">
+                          <input 
+                              value={ingredientsInput} 
+                              onChange={e => setIngredientsInput(e.target.value)} 
+                              placeholder="ex: ouă, spanac, avocado..." 
+                              className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-sm focus:outline-none text-white placeholder-white/30"
+                          />
+                          <button onClick={generateMealPlan} disabled={isMealLoading} className="bg-white text-emerald-900 px-4 py-2 rounded-xl font-bold hover:bg-emerald-50 transition">
+                              {isMealLoading ? <Loader className="w-5 h-5 animate-spin"/> : 'Generează'}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </Card>
+          {generatedMeal && (
+              <Card className="animate-fade-in border-l-4 border-l-emerald-500">
+                  <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-3">Rețeta Recomandată:</h3>
+                  <div className="prose prose-sm text-slate-600 dark:text-neutral-300 whitespace-pre-line">
+                      {generatedMeal}
+                  </div>
+              </Card>
+          )}
+      </div>
+  );
+
+  // --- REDESIGNED CHALLENGES SECTION ---
+  const renderChallenges = () => (
+      <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+          <div className="text-center mb-10">
+              <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-3">Provocarea de 30 de Zile</h1>
+              <p className="text-slate-500 dark:text-neutral-400 max-w-lg mx-auto">
+                  Transformă o dorință într-un obicei de fier.
+              </p>
+          </div>
+
+          {!userData.challengeConfig.isConfigured ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                  {/* Left: Predefined Suggestions */}
+                  <Card className="bg-white dark:bg-neutral-900 border-none shadow-lg">
+                      <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                          <Medal className="w-5 h-5 text-indigo-500"/> Sugestii Populare
+                      </h3>
+                      <div className="space-y-3">
+                          {[
+                              { name: "Fără Zahăr", reward: "Ten curat & Energie stabilă", icon: "🍬" },
+                              { name: "Dușuri Reci", reward: "Dopamină & Imunitate", icon: "🚿" },
+                              { name: "30 Min Citit", reward: "Claritate mentală", icon: "📚" },
+                              { name: "Fără Social Media", reward: "Timp recâștigat", icon: "📱" },
+                              { name: "Alergare Zilnică", reward: "Condiție fizică", icon: "🏃" }
+                          ].map((s, idx) => (
+                              <div 
+                                  key={idx}
+                                  onClick={() => updateChallengeConfig({ name: s.name, reward: s.reward, isConfigured: false })}
+                                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-neutral-800 hover:bg-indigo-50 dark:hover:bg-neutral-700 cursor-pointer transition border border-transparent hover:border-indigo-200 group"
+                              >
+                                  <div className="flex items-center gap-3">
+                                      <span className="text-xl">{s.icon}</span>
+                                      <div>
+                                          <div className="font-bold text-sm text-slate-700 dark:text-white">{s.name}</div>
+                                          <div className="text-xs text-slate-500 dark:text-neutral-400">{s.reward}</div>
+                                      </div>
+                                  </div>
+                                  <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500"/>
+                              </div>
+                          ))}
+                      </div>
+                  </Card>
+
+                  {/* Right: Custom Configurator */}
+                  <Card className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white border-none p-8 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full blur-[80px] opacity-20 -mr-16 -mt-16"></div>
+                      <div className="relative z-10">
+                          <div className="flex items-center gap-3 mb-6">
+                              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-md"><Flame className="w-6 h-6 text-orange-400"/></div>
+                              <h2 className="text-xl font-bold">Configurează</h2>
+                          </div>
+                          
+                          <div className="space-y-5">
+                              <div>
+                                  <label className="text-xs font-bold text-indigo-200 uppercase tracking-wide mb-2 block">Numele Provocării</label>
+                                  <input 
+                                      placeholder="ex: Meditație la 6 AM..." 
+                                      className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white placeholder-indigo-200/50 focus:ring-2 focus:ring-orange-400 outline-none transition"
+                                      value={userData.challengeConfig.name}
+                                      onChange={(e) => updateChallengeConfig({...challengeConfig, name: e.target.value})}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-xs font-bold text-indigo-200 uppercase tracking-wide mb-2 block">Recompensa (De ce?)</label>
+                                  <input 
+                                      placeholder="ex: Mă voi simți invincibil..." 
+                                      className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white placeholder-indigo-200/50 focus:ring-2 focus:ring-orange-400 outline-none transition"
+                                      value={userData.challengeConfig.reward}
+                                      onChange={(e) => updateChallengeConfig({...challengeConfig, reward: e.target.value})}
+                                  />
+                              </div>
+                              <button 
+                                  disabled={!userData.challengeConfig.name}
+                                  onClick={() => updateChallengeConfig({...challengeConfig, isConfigured: true})}
+                                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-orange-500/30 flex justify-center items-center gap-2 mt-4"
+                              >
+                                  Start Aventură <ArrowRight className="w-5 h-5"/>
+                              </button>
+                          </div>
+                      </div>
+                  </Card>
+              </div>
+          ) : (
+              <Card className="bg-neutral-900 border-neutral-800 overflow-hidden relative">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-rose-600/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
+
+                  {/* Active Header */}
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-neutral-800 pb-6 relative z-10">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-gradient-to-br from-rose-500 to-orange-600 rounded-2xl shadow-lg shadow-rose-900/30">
+                              <Flame className="w-8 h-8 text-white animate-pulse-slow"/>
+                          </div>
+                          <div>
+                              <h2 className="text-2xl font-bold text-white tracking-tight">{userData.challengeConfig.name}</h2>
+                              <div className="flex items-center gap-2 text-rose-300 text-sm mt-1">
+                                  <Gift className="w-3 h-3"/>
+                                  <span>Recompensă: {userData.challengeConfig.reward || "Satisfacție personală"}</span>
+                              </div>
+                          </div>
+                      </div>
+                      <div className="mt-4 md:mt-0 flex items-center gap-6">
+                          <div className="text-right">
+                              <div className="text-3xl font-bold text-white leading-none">{userData.challengeProgress.filter(Boolean).length}<span className="text-neutral-600 text-lg">/30</span></div>
+                              <div className="text-xs text-neutral-500 font-medium uppercase tracking-wider mt-1">Zile Completate</div>
+                          </div>
+                          <div className="text-right border-l border-neutral-800 pl-6">
+                              <div className="text-3xl font-bold text-white leading-none">{30 - userData.challengeProgress.filter(Boolean).length}</div>
+                              <div className="text-xs text-neutral-500 font-medium uppercase tracking-wider mt-1">Zile Rămase</div>
+                          </div>
+                          <button 
+                              onClick={() => updateChallengeConfig({...challengeConfig, isConfigured: false})} 
+                              className="p-2 bg-neutral-800 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-700 transition ml-2"
+                              title="Editează Provocarea"
+                          >
+                              <Edit3 className="w-4 h-4"/>
+                          </button>
+                      </div>
+                  </div>
+                  
+                  {/* Grid Vizual Interactiv */}
+                  <div className="relative z-10">
+                      <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-10 gap-3">
+                          {userData.challengeProgress.map((done, idx) => (
+                              <button 
+                                  key={idx} 
+                                  onClick={() => {
+                                      const newProg = [...challengeProgress];
+                                      newProg[idx] = !newProg[idx];
+                                      updateChallengeProgress(newProg);
+                                      if(!newProg[idx]) return; 
+                                      if ((idx + 1) % 7 === 0) triggerNotification("Bravo!", `Ai completat săptămâna ${Math.ceil((idx + 1) / 7)}!`, "success");
+                                  }}
+                                  className={`
+                                      aspect-square rounded-xl flex flex-col items-center justify-center text-sm font-bold transition-all duration-300 relative overflow-hidden group
+                                      ${done 
+                                          ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/50 scale-105 border border-rose-500' 
+                                          : 'bg-neutral-800 text-neutral-500 border border-neutral-700 hover:border-neutral-600 hover:bg-neutral-750'
+                                      }
+                                  `}
+                              >
+                                  <span className={`relative z-10 ${done ? 'text-lg' : ''}`}>{idx + 1}</span>
+                                  {done && <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>}
+                                  {done && <CheckCircle className="w-3 h-3 absolute bottom-1 opacity-50"/>}
+                              </button>
+                          ))}
+                      </div>
+                      
+                      {/* Bară Progres */}
+                      <div className="w-full h-1 bg-neutral-800 mt-8 rounded-full overflow-hidden">
+                          <div 
+                              className="h-full bg-gradient-to-r from-rose-500 to-orange-500 transition-all duration-1000 ease-out" 
+                              style={{width: `${(userData.challengeProgress.filter(Boolean).length / 30) * 100}%`}}
+                          ></div>
+                      </div>
+                      
+                      {/* Motivational Footer */}
+                      <div className="mt-6 text-center text-neutral-500 text-xs italic">
+                          "Nu te opri când ești obosit. Oprește-te când ai terminat."
+                      </div>
+                  </div>
+              </Card>
+          )}
+      </div>
+  );
+
+  const renderMindfulness = () => (
+    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-24 md:pb-0">
+        <div className="text-center mb-10">
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Sanctuarul Minții</h1>
+            <p className="text-slate-500 dark:text-neutral-400">Echilibru interior prin respirație și recunoștință.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="flex flex-col items-center justify-center min-h-[400px] bg-gradient-to-b from-cyan-50 to-blue-50 dark:from-neutral-900 dark:to-black border-cyan-100 dark:border-neutral-800 relative overflow-hidden">
+                <div className="absolute top-4 right-4 bg-white dark:bg-neutral-800 px-3 py-1 rounded-full text-xs font-bold text-cyan-600 dark:text-cyan-400 shadow-sm flex items-center gap-1">
+                    <Wind className="w-3 h-3"/> 4-7-8 (Relaxare)
+                </div>
+                <div 
+                    className={`w-48 h-48 rounded-full bg-gradient-to-tr from-cyan-400 to-blue-500 flex items-center justify-center text-white text-2xl font-bold shadow-2xl shadow-cyan-400/40 transition-all ease-in-out ${breathingScale} ${breathingDuration}`}
+                >
+                    {breathingPhase}
+                </div>
+                <p className="mt-8 text-slate-600 dark:text-neutral-400 text-center max-w-xs text-sm">
+                    {isBreathing 
+                        ? (breathingPhase === 'Inspiră' ? "Umple plămânii încet..." : breathingPhase === 'Ține' ? "Păstrează aerul..." : "Eliberează tot aerul...")
+                        : "Protocol 4-7-8: Inspiră 4s, Ține 7s, Expiră 8s. Reduce anxietatea rapid."}
+                </p>
+                <button 
+                    onClick={() => setIsBreathing(!isBreathing)}
+                    className={`mt-6 px-8 py-3 rounded-xl font-bold transition shadow-lg ${isBreathing ? 'bg-slate-200 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                    {isBreathing ? 'Oprește' : 'Începe Respirația'}
+                </button>
+            </Card>
+
+            <Card className="bg-gradient-to-b from-rose-50 to-pink-50 dark:from-neutral-900 dark:to-black border-rose-100 dark:border-neutral-800">
+                <div className="flex items-center gap-2 mb-6">
+                    <Heart className="w-6 h-6 text-rose-500 fill-rose-500"/>
+                    <h2 className="text-xl font-bold text-rose-900 dark:text-neutral-200">Jurnal de Recunoștință</h2>
+                </div>
+                <p className="text-sm text-rose-800 dark:text-neutral-400 mb-6 opacity-80">Ce te-a făcut să zâmbești astăzi? Scrie sau alege o sugestie.</p>
+                <div className="space-y-6">
+                    {gratitudeLog.map((val, idx) => (
+                        <div key={idx}>
+                            <div className="relative">
+                                <span className="absolute left-4 top-3.5 text-rose-300 dark:text-neutral-500 font-bold">{idx + 1}.</span>
+                                <input 
+                                    value={val}
+                                    onChange={(e) => {
+                                        const newLog = [...gratitudeLog];
+                                        newLog[idx] = e.target.value;
+                                        setGratitudeLog(newLog);
+                                    }}
+                                    placeholder="Sunt recunoscător pentru..."
+                                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-neutral-900 border border-rose-100 dark:border-neutral-800 rounded-xl text-slate-700 dark:text-neutral-200 focus:ring-2 focus:ring-rose-300 outline-none transition placeholder-rose-200 dark:placeholder-neutral-600"
+                                />
+                            </div>
+                            {val === "" && (
+                                <div className="flex gap-2 mt-2 flex-wrap">
+                                    {['Un apus frumos', 'O cafea bună', 'Sănătatea mea', 'Un prieten drag', 'Muzica preferată'].map(suggestion => (
+                                        <button 
+                                            key={suggestion}
+                                            onClick={() => {
+                                                const newLog = [...gratitudeLog];
+                                                newLog[idx] = suggestion;
+                                                setGratitudeLog(newLog);
+                                            }}
+                                            className="text-xs bg-white/50 dark:bg-neutral-900/50 px-3 py-1 rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-neutral-800 transition"
+                                        >
+                                            {suggestion}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+                <button onClick={saveJournalEntry} className="w-full mt-6 bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
+                    <Book className="w-4 h-4"/> Salvează în Jurnal
+                </button>
+            </Card>
+        </div>
+
+        {userData.journalHistory.length > 0 && (
+            <div className="mt-12">
+                <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                    <Book className="w-6 h-6 text-indigo-500"/> Memoriile Tale
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {userData.journalHistory.map((entry) => (
+                        <Card key={entry.id} className="relative group hover:shadow-md transition">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <div className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                        <Calendar className="w-4 h-4 text-indigo-500"/> {entry.date}
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-neutral-500 flex items-center gap-1 mt-1">
+                                        <Clock className="w-3 h-3"/> {entry.time}
+                                    </div>
+                                </div>
+                            </div>
+                            <ul className="space-y-2">
+                                {entry.entries.map((item, idx) => (
+                                    <li key={idx} className="text-sm text-slate-600 dark:text-neutral-300 flex items-start gap-2">
+                                        {/* DEFENSIVE CHECK: Ensure item is a string */}
+                                        <span className="text-rose-400 mt-1">•</span> {typeof item === 'string' ? item : JSON.stringify(item)}
+                                    </li>
+                                ))}
+                            </ul>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        )}
+    </div>
+  );
+
+  const renderProfile = () => (
+    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in pb-24 md:pb-0">
+        <div className="relative">
+            <div className="h-32 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-3xl"></div>
+            <div className="bg-white dark:bg-neutral-950 rounded-b-3xl shadow-sm border border-slate-100 dark:border-neutral-800 p-6 pt-0 relative">
+                <div className="flex flex-col md:flex-row items-center md:items-end -mt-12 mb-4 gap-4">
+                    <div className="w-24 h-24 bg-slate-100 dark:bg-neutral-900 rounded-full border-4 border-white dark:border-neutral-950 shadow-md flex items-center justify-center overflow-hidden">
+                        <User className="w-10 h-10 text-slate-300 dark:text-neutral-600"/>
+                    </div>
+                    <div className="text-center md:text-left flex-1">
+                        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{userData.profile?.name || 'Utilizator'}</h1>
+                        <p className="text-slate-500 dark:text-neutral-400 text-sm">Biohacker Level 3 • {userData.profile?.age || 0} ani</p>
+                        <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">{currentUser?.email}</p>
+                    </div>
+                    <button onClick={shareApp} className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition flex items-center gap-2">
+                        <Share2 className="w-4 h-4"/> Recomandă App
+                    </button>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 border-t border-slate-100 dark:border-neutral-800 pt-6 text-center">
+                    <div>
+                        <div className="font-bold text-xl text-slate-800 dark:text-white">{score}</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-wide">Scor Azi</div>
+                    </div>
+                    <div>
+                        <div className="font-bold text-xl text-slate-800 dark:text-white">{userData.customHabits.length}</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-wide">Protocoale</div>
+                    </div>
+                    <div>
+                        <div className="font-bold text-xl text-slate-800 dark:text-white">{userData.challengeProgress.filter(Boolean).length}</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-wide">Zile Provocare</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-lg">
+                <Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400"/> Protocoalele Tale Active
+            </h3>
+            {userData.customHabits.length === 0 ? (
+                <div className="text-center p-8 bg-slate-50 dark:bg-neutral-900 rounded-2xl border border-dashed border-slate-300 dark:border-neutral-700">
+                    <p className="text-slate-500 dark:text-neutral-400">Nu ai definit încă niciun protocol personalizat.</p>
+                    <button onClick={() => setActiveTab('dashboard')} className="text-indigo-600 dark:text-indigo-400 font-bold text-sm mt-2 hover:underline">Mergi la Laborator</button>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {userData.customHabits.map((habit) => (
+                        <div key={habit.id} className="bg-white dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between shadow-sm hover:shadow-md transition">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold">
+                                    {habit.what[0].toUpperCase()}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-800 dark:text-white">{habit.what}</div>
+                                    <div className="text-xs text-slate-500 dark:text-neutral-400 flex gap-2">
+                                        <span className="bg-slate-100 dark:bg-neutral-900 px-2 py-0.5 rounded text-slate-500 dark:text-neutral-400">{habit.when}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => removeHabit(habit.id)} className="p-2 text-slate-300 hover:text-red-500 transition">
+                                <Trash2 className="w-5 h-5"/>
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+        
+         <div>
+            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-lg">
+                <Settings className="w-5 h-5 text-slate-600 dark:text-neutral-400"/> Setări Cont
+            </h3>
+            <Card className="space-y-4">
+                <div onClick={toggleDarkMode} className="flex justify-between items-center p-2 hover:bg-slate-50 dark:hover:bg-neutral-900 rounded-lg transition cursor-pointer">
+                    <span className="text-slate-700 dark:text-neutral-200 font-medium">Mod Întunecat</span>
+                    <div className={`w-10 h-5 rounded-full relative transition-colors duration-300 ${darkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm transition-all duration-300 ${darkMode ? 'left-6' : 'left-1'}`}></div>
+                    </div>
+                </div>
+                <div className="flex justify-between items-center p-2">
+                    <span className="text-slate-700 dark:text-neutral-200 font-medium">Sincronizare Cloud</span>
+                    <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full font-bold flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3"/> Activ
+                    </span>
+                </div>
+                <div className="pt-4 border-t border-slate-100 dark:border-neutral-800">
+                     <button onClick={handleLogout} className="text-red-500 text-sm font-bold flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition w-full">
+                        <LogOut className="w-4 h-4"/> Deconectare
+                    </button>
+                </div>
+            </Card>
+         </div>
+    </div>
+  );
+
+  const renderKnowledge = () => (
+    <div className="space-y-6 pb-24 md:pb-0 animate-fade-in">
+        <div className="bg-indigo-900 dark:bg-black text-white p-10 rounded-3xl relative overflow-hidden shadow-xl border border-transparent dark:border-neutral-800">
+            <div className="relative z-10 max-w-2xl">
+                <h2 className="text-3xl font-bold mb-4">Cunoașterea este Putere</h2>
+                <p className="text-indigo-200 text-lg">Explorează mecanismele biologice care îți controlează energia, fericirea și productivitatea.</p>
+            </div>
+            <BookOpen className="absolute -right-6 -bottom-6 w-48 h-48 text-indigo-950 dark:text-neutral-900 opacity-50" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500 rounded-full blur-[100px] opacity-20"></div>
+        </div>
+        {Object.entries(knowledgeBase).map(([category, items]) => (
+            <div key={category}>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize mb-4 ml-2 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-indigo-500 rounded-full"></span> {category}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {items.map((item, idx) => (
+                        <Card key={idx} className="hover:shadow-lg transition hover:-translate-y-1 duration-300 border-l-4 border-l-transparent hover:border-l-indigo-500">
+                            <h4 className="font-bold text-slate-800 dark:text-white mb-2">{item.title}</h4>
+                            <p className="text-sm text-slate-600 dark:text-neutral-400 leading-relaxed">{item.content}</p>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        ))}
+    </div>
+  );
+
+  const renderAICoach = () => (
+    <div className="h-[85vh] flex flex-col bg-white dark:bg-neutral-950 rounded-3xl shadow-2xl overflow-hidden animate-fade-in border border-slate-100 dark:border-neutral-800 max-w-4xl mx-auto">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-neutral-900 dark:to-neutral-950 p-6 text-white flex justify-between items-center shadow-md z-10 dark:border-b dark:border-neutral-800">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl"><Zap className="w-6 h-6"/></div>
+                <div>
+                    <h2 className="font-bold text-lg">BioSync Mentor</h2>
+                    <p className="text-xs text-indigo-100 dark:text-neutral-400 font-medium">Inteligență Artificială & Neuroștiință</p>
+                </div>
+            </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 dark:bg-black">
+            {chatHistory.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                    <Sparkles className="w-16 h-16 mb-4 text-indigo-200 dark:text-neutral-800 animate-pulse"/>
+                    <p className="font-medium text-lg text-slate-600 dark:text-neutral-500">Cum te pot ajuta astăzi?</p>
+                    <div className="flex gap-2 mt-4">
+                        <span className="text-xs bg-white dark:bg-neutral-900 px-3 py-1 rounded-full border border-slate-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400">Somn</span>
+                        <span className="text-xs bg-white dark:bg-neutral-900 px-3 py-1 rounded-full border border-slate-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400">Stres</span>
+                        <span className="text-xs bg-white dark:bg-neutral-900 px-3 py-1 rounded-full border border-slate-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400">Nutriție</span>
+                    </div>
+                </div>
+            )}
+            {chatHistory.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`p-5 rounded-2xl max-w-[85%] text-sm leading-relaxed shadow-sm ${
+                        m.role === 'user' 
+                        ? 'bg-indigo-600 text-white rounded-br-none' 
+                        : 'bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-bl-none'
+                    }`}>
+                        {m.content}
+                    </div>
+                </div>
+            ))}
+            {isTyping && (
+                 <div className="flex justify-start">
+                    <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 px-4 py-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1 items-center">
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span>
+                    </div>
+                </div>
+            )}
+            <div ref={chatEndRef} />
+        </div>
+
+        <div className="p-4 bg-white dark:bg-neutral-950 border-t border-slate-100 dark:border-neutral-800">
+            <div className="flex gap-3 bg-slate-50 dark:bg-neutral-900 p-2 rounded-2xl border border-slate-200 dark:border-neutral-800 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-neutral-700 transition-all">
+                <input 
+                    value={chatInput} 
+                    onChange={e => setChatInput(e.target.value)} 
+                    onKeyPress={e => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Scrie mesajul tău..." 
+                    className="flex-1 bg-transparent border-none px-4 py-2 text-sm focus:outline-none text-slate-800 dark:text-neutral-200 placeholder-slate-400 dark:placeholder-neutral-600"
+                />
+                <button onClick={handleSendMessage} className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl transition shadow-md">
+                    <Send className="w-5 h-5"/>
+                </button>
+            </div>
+        </div>
+    </div>
+  );
+
+  // --- Main Render ---
+  
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/50 mb-4 animate-pulse">
+            <Activity className="w-8 h-8 text-white" />
+          </div>
+          <Loader className="w-6 h-6 text-indigo-400 animate-spin mx-auto"/>
+        </div>
+      </div>
+    );
+  }
+
+  // Auth screen (not logged in)
+  if (!currentUser) {
+    return renderAuthScreen();
+  }
+
+  // Data loading
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-8 h-8 text-indigo-400 animate-spin mx-auto mb-4"/>
+          <p className="text-neutral-400">Se încarcă datele tale...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-black font-sans text-slate-900 dark:text-neutral-100 flex flex-col md:flex-row">
+    <div className={`min-h-screen bg-slate-50 dark:bg-black font-sans text-slate-900 dark:text-neutral-100 flex flex-col md:flex-row transition-colors duration-300`}>
+      
+      {/* Disclaimer Modal */}
       {showDisclaimer && (
-        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-white dark:bg-neutral-900 rounded-3xl p-8">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="max-w-lg w-full bg-white dark:bg-neutral-900 rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-neutral-800">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center mb-4"><Heart className="w-8 h-8 text-white"/></div>
+              <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4">
+                <Heart className="w-8 h-8 text-white" />
+              </div>
               <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Bun venit în BioSync Pro!</h2>
               <p className="text-slate-500 dark:text-neutral-400 text-sm">Creat cu pasiune de Cristian Puravu</p>
             </div>
-            <div className="bg-slate-50 dark:bg-neutral-800 rounded-xl p-4 mb-6 text-sm text-slate-600 dark:text-neutral-300 space-y-2">
-              <p><strong>📋 Disclaimer:</strong></p>
-              <p>Aplicația este în scop educațional. <strong>Nu constituie sfaturi medicale.</strong></p>
-              <p>Consultă un specialist înainte de schimbări majore în stilul de viață.</p>
-              <p>Utilizarea se face pe propria răspundere.</p>
+            
+            <div className="bg-slate-50 dark:bg-neutral-800 rounded-xl p-4 mb-6 text-sm text-slate-600 dark:text-neutral-300 space-y-3">
+              <p>
+                <strong className="text-slate-800 dark:text-white">📋 Disclaimer Important:</strong>
+              </p>
+              <p>
+                Această aplicație este creată în scop educațional și de uz personal. Informațiile oferite <strong>nu constituie sfaturi medicale, nutriționale sau psihologice</strong> profesionale.
+              </p>
+              <p>
+                Consultă întotdeauna un specialist calificat înainte de a face schimbări semnificative în stilul tău de viață, dietă sau rutină de sănătate.
+              </p>
+              <p>
+                Utilizarea aplicației se face pe propria răspundere. Creatorul nu își asumă responsabilitatea pentru deciziile luate pe baza informațiilor prezentate.
+              </p>
             </div>
-            <button onClick={acceptDisclaimer} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5"/> Am înțeles</button>
-            <p className="text-center text-xs text-slate-400 mt-4">© {new Date().getFullYear()} Cristian Puravu</p>
+            
+            <button 
+              onClick={acceptDisclaimer}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition shadow-lg flex items-center justify-center gap-2"
+            >
+              <CheckCircle className="w-5 h-5" /> Am înțeles, continuă
+            </button>
+            
+            <p className="text-center text-xs text-slate-400 dark:text-neutral-500 mt-4">
+              © {new Date().getFullYear()} Cristian Puravu. Toate drepturile rezervate.
+            </p>
           </div>
         </div>
       )}
 
-      {showNotification && (
-        <div className="fixed top-4 right-4 z-[90] bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700 rounded-xl p-4 shadow-lg animate-fade-in max-w-sm">
-          <p className="font-bold text-slate-800 dark:text-white">{showNotification.title}</p>
-          <p className="text-sm text-slate-500 dark:text-neutral-400">{showNotification.message}</p>
+      {/* Sidebar Desktop */}
+      <nav className="bg-white dark:bg-black border-r border-slate-200 dark:border-neutral-800 w-20 lg:w-64 h-screen fixed hidden md:flex flex-col z-50 shadow-sm transition-colors duration-300">
+        <div className="p-6">
+          <div className="flex items-center gap-3 text-indigo-700 dark:text-indigo-400 font-bold text-xl">
+             <div className="w-10 h-10 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                <Activity className="w-6 h-6"/>
+             </div>
+             <span className="hidden lg:block tracking-tight">BioSync</span>
+          </div>
         </div>
-      )}
-
-      <nav className="bg-white dark:bg-black border-r border-slate-200 dark:border-neutral-800 w-20 lg:w-64 h-screen fixed hidden md:flex flex-col z-50">
-        <div className="p-6"><div className="flex items-center gap-3 text-indigo-700 dark:text-indigo-400 font-bold text-xl"><div className="w-10 h-10 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center text-white"><Activity className="w-6 h-6"/></div><span className="hidden lg:block">BioSync</span></div></div>
-        <div className="flex-1 px-4 space-y-2 mt-4">
-          {[{id:'dashboard',label:'Dashboard',icon:Activity},{id:'focus',label:'Focus',icon:Timer},{id:'nutrition',label:'Nutriție',icon:Utensils},{id:'challenges',label:'Provocări',icon:Flame},{id:'mindfulness',label:'Mindfulness',icon:Smile},{id:'knowledge',label:'Bibliotecă',icon:BookOpen},{id:'profile',label:'Profil',icon:User},{id:'ai-coach',label:'AI Coach',icon:Zap}].map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition ${activeTab === item.id ? 'bg-indigo-50 dark:bg-neutral-900 text-indigo-700 dark:text-indigo-400 font-bold' : 'text-slate-500 dark:text-neutral-400 hover:bg-slate-50 dark:hover:bg-neutral-900'}`}>
-              <item.icon className="w-5 h-5"/><span className="hidden lg:block text-sm">{item.label}</span>
-            </button>
-          ))}
+        <div className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto scrollbar-hide">
+            {[
+                { id: 'dashboard', label: 'Dashboard', icon: Activity },
+                { id: 'focus', label: 'Focus Zen', icon: Timer },
+                { id: 'nutrition', label: 'Nutriție AI', icon: Utensils },
+                { id: 'challenges', label: 'Provocări', icon: Flame },
+                { id: 'mindfulness', label: 'Minte & Suflet', icon: Smile },
+                { id: 'knowledge', label: 'Bibliotecă', icon: BookOpen },
+                { id: 'profile', label: 'Profilul Meu', icon: User },
+                { id: 'ai-coach', label: 'AI Coach', icon: Zap },
+            ].map((item) => (
+                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all duration-300 group ${activeTab === item.id ? 'bg-indigo-50 dark:bg-neutral-900 text-indigo-700 dark:text-indigo-400 font-bold shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:bg-slate-50 dark:hover:bg-neutral-900 hover:text-slate-900 dark:hover:text-neutral-200'}`}>
+                    <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'stroke-[2.5px]' : ''}`} />
+                    <span className="hidden lg:block text-sm font-medium">{item.label}</span>
+                    {activeTab === item.id && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500 hidden lg:block"></div>}
+                </button>
+            ))}
         </div>
       </nav>
 
-      <nav className="md:hidden fixed bottom-0 w-full bg-white/90 dark:bg-black/90 backdrop-blur-lg border-t border-slate-200 dark:border-neutral-800 z-50">
-        <div className="flex justify-around p-2">
-          {[{id:'dashboard',icon:Activity},{id:'focus',icon:Timer},{id:'challenges',icon:Flame},{id:'mindfulness',icon:Smile},{id:'ai-coach',icon:Zap},{id:'profile',icon:User}].map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`p-3 rounded-2xl ${activeTab === item.id ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-neutral-900' : 'text-slate-400'}`}><item.icon className="w-6 h-6"/></button>
-          ))}
+      {/* Mobile Bottom Bar */}
+      <nav className="md:hidden fixed bottom-0 w-full bg-white/90 dark:bg-black/90 backdrop-blur-lg border-t border-slate-200 dark:border-neutral-800 z-50 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.02)] transition-colors duration-300">
+        <div className="flex justify-start overflow-x-auto p-2 gap-2 scrollbar-hide">
+            {[{ id: 'dashboard', icon: Activity }, { id: 'focus', icon: Timer }, { id: 'nutrition', icon: Utensils }, { id: 'challenges', icon: Flame }, { id: 'mindfulness', icon: Smile }, { id: 'ai-coach', icon: Zap }, { id: 'profile', icon: User }].map((item) => (
+                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`p-3 rounded-2xl flex-shrink-0 transition-all ${activeTab === item.id ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-neutral-900 scale-110' : 'text-slate-400 dark:text-neutral-500'}`}>
+                    <item.icon className="w-6 h-6" />
+                </button>
+            ))}
         </div>
       </nav>
 
-      <main className="flex-1 md:ml-20 lg:ml-64 p-4 md:p-8 min-h-screen pb-24 md:pb-8">
+      {/* Main Content */}
+      <main className="flex-1 md:ml-20 lg:ml-64 p-4 md:p-8 min-h-screen bg-slate-50/50 dark:bg-black transition-colors duration-300">
         <div className="max-w-6xl mx-auto">
-          
-          {activeTab === 'dashboard' && (
-            <div className="space-y-8 animate-fade-in">
-              <div className="relative rounded-3xl overflow-hidden bg-black text-white shadow-2xl border border-neutral-800">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
-                <div className="relative z-10 p-8 flex flex-col md:flex-row justify-between items-center gap-6">
-                  <div>
-                    <div className="flex items-center gap-4 mb-4">
-                      {['😞','😐','🙂','🤩'].map((m,idx) => (<button key={idx} onClick={() => setMoodValue(idx)} className={`text-2xl hover:scale-125 transition ${userData.mood === idx ? 'scale-125' : 'opacity-50'}`}>{m}</button>))}
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-bold mb-2">Salut, {userData.profile?.name || 'Oaspete'}!</h1>
-                    <div className="flex gap-4 flex-wrap mt-4">
-                      <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10"><Droplets className="w-4 h-4 text-blue-400"/><span className="font-bold">{userData.waterIntake} / {userData.waterGoal} ml</span></div>
-                      <div className="flex gap-2">{[250,500].map(amt => (<button key={amt} onClick={() => addWater(amt)} className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-lg text-sm font-bold hover:bg-blue-500/30">+{amt}ml</button>))}</div>
-                      <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10"><Zap className="w-4 h-4 text-amber-400"/><span className="font-bold">{score} / 100</span></div>
-                    </div>
-                  </div>
-                  <div className="relative"><span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl font-bold">{score}</span><CircularProgress score={score} size={32}/></div>
+            {activeTab === 'dashboard' && renderDashboard()}
+            {activeTab === 'focus' && renderFocus()}
+            {activeTab === 'nutrition' && renderNutrition()}
+            {activeTab === 'challenges' && renderChallenges()}
+            {activeTab === 'mindfulness' && renderMindfulness()}
+            {activeTab === 'profile' && renderProfile()}
+            {activeTab === 'knowledge' && renderKnowledge()}
+            {activeTab === 'ai-coach' && renderAICoach()}
+            
+            {/* Footer */}
+            <footer className="mt-16 mb-24 md:mb-8 py-8 border-t border-slate-200 dark:border-neutral-800 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex items-center gap-2 text-slate-400 dark:text-neutral-500 text-sm">
+                  <Heart className="w-4 h-4 text-rose-400 fill-rose-400" />
+                  <span>Creat cu pasiune de <strong className="text-slate-600 dark:text-neutral-300">Cristian Puravu</strong></span>
                 </div>
+                <p className="text-xs text-slate-400 dark:text-neutral-600">
+                  © {new Date().getFullYear()} BioSync Pro. Toate drepturile rezervate.
+                </p>
+                <p className="text-xs text-slate-400 dark:text-neutral-600 max-w-md">
+                  Informațiile din această aplicație sunt în scop educațional și nu înlocuiesc sfatul medical profesional.
+                </p>
               </div>
-              
-              <h3 className="font-bold text-xl flex items-center gap-2 text-slate-800 dark:text-white"><Target className="w-6 h-6 text-indigo-500"/> Laborator de Obiceiuri</h3>
-              <Card className="border-l-4 border-l-indigo-500">
-                <div className="space-y-4">
-                  <div className="flex items-center bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl px-4 py-3"><Zap className="w-5 h-5 text-indigo-500 mr-3"/><input value={newHabit.what} onChange={e => setNewHabit({...newHabit, what: e.target.value})} placeholder="Voi face..." className="w-full outline-none bg-transparent dark:text-white"/></div>
-                  <div className="flex gap-4"><div className="flex-1 flex items-center bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl px-4 py-3"><Activity className="w-5 h-5 text-amber-500 mr-3"/><input value={newHabit.when} onChange={e => setNewHabit({...newHabit, when: e.target.value})} placeholder="După..." className="w-full outline-none bg-transparent dark:text-white"/></div><button onClick={addCustomHabit} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus className="w-5 h-5"/> Adaugă</button></div>
-                </div>
-              </Card>
-
-              <h3 className="font-bold text-xl flex items-center gap-2 text-slate-800 dark:text-white mt-8"><ShieldCheck className="w-6 h-6 text-emerald-500"/> Protocoale Zilnice</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[{id:'sleep',label:'Somn 7-8h',icon:Moon,color:'indigo'},{id:'nature',label:'Lumină Solară',icon:Sun,color:'amber'},{id:'reading',label:'Deep Work',icon:BookOpen,color:'emerald'},{id:'alcohol',label:'Zero Toxine',icon:Wine,color:'rose'}].map(item => (
-                  <div key={item.id} onClick={() => toggleHabit(item.id)} className={`p-4 rounded-2xl border flex flex-col items-center gap-2 cursor-pointer transition hover:scale-105 ${userData.dailyHabits[item.id] ? `bg-${item.color}-50 dark:bg-neutral-900 border-${item.color}-200` : 'bg-white dark:bg-neutral-950 border-slate-100 dark:border-neutral-800'}`}>
-                    <item.icon className={`w-8 h-8 ${userData.dailyHabits[item.id] ? `text-${item.color}-500` : 'text-slate-400'}`}/>
-                    <span className={`text-sm font-bold text-center ${userData.dailyHabits[item.id] ? `text-${item.color}-700 dark:text-${item.color}-300` : 'text-slate-600 dark:text-neutral-400'}`}>{item.label}</span>
-                    {userData.dailyHabits[item.id] && <CheckCircle className={`w-5 h-5 text-${item.color}-500`}/>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'focus' && (
-            <div className="max-w-xl mx-auto text-center space-y-8 py-10 animate-fade-in">
-              <h2 className="text-3xl font-bold text-slate-800 dark:text-white">Focus Zen</h2>
-              <Card className="flex flex-col items-center p-12 bg-neutral-900 border-neutral-800">
-                <div className="text-6xl font-mono font-bold text-white mb-8">{formatTime(focusTime)}</div>
-                <div className="flex gap-4">
-                  <button onClick={() => setIsFocusActive(!isFocusActive)} className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center hover:bg-indigo-500">{isFocusActive ? <Pause className="w-8 h-8 text-white"/> : <Play className="w-8 h-8 text-white ml-1"/>}</button>
-                  <button onClick={() => { setIsFocusActive(false); setFocusTime(25*60); }} className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center hover:bg-neutral-700"><RotateCcw className="w-6 h-6 text-neutral-400"/></button>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {activeTab === 'nutrition' && (
-            <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
-              <div className="text-center"><h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Nutriție AI</h1></div>
-              <Card className="bg-gradient-to-r from-emerald-900 to-teal-900 text-white border-none">
-                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Utensils className="w-6 h-6"/> Chef AI</h2>
-                <div className="flex gap-2">
-                  <input value={ingredientsInput} onChange={e => setIngredientsInput(e.target.value)} placeholder="ouă, spanac, avocado..." className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white placeholder-white/30"/>
-                  <button onClick={generateMealPlan} disabled={isMealLoading} className="bg-white text-emerald-900 px-4 py-2 rounded-xl font-bold">{isMealLoading ? <Loader className="w-5 h-5 animate-spin"/> : 'Generează'}</button>
-                </div>
-              </Card>
-              {generatedMeal && <Card className="border-l-4 border-l-emerald-500"><h3 className="font-bold text-lg mb-3 text-slate-800 dark:text-white">Rețeta:</h3><p className="text-slate-600 dark:text-neutral-300 whitespace-pre-line">{generatedMeal}</p></Card>}
-            </div>
-          )}
-
-          {activeTab === 'challenges' && (
-            <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
-              <div className="text-center"><h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Provocarea de 30 Zile</h1></div>
-              {!userData.challengeConfig.isConfigured ? (
-                <Card className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white border-none p-8">
-                  <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-white/10 rounded-xl"><Flame className="w-6 h-6 text-orange-400"/></div><h2 className="text-xl font-bold">Configurează Provocarea</h2></div>
-                  <div className="space-y-4">
-                    <input placeholder="Numele provocării..." className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white placeholder-white/50" value={userData.challengeConfig.name} onChange={e => updateChallenge({...userData.challengeConfig, name: e.target.value})}/>
-                    <input placeholder="Recompensa..." className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white placeholder-white/50" value={userData.challengeConfig.reward} onChange={e => updateChallenge({...userData.challengeConfig, reward: e.target.value})}/>
-                    <button disabled={!userData.challengeConfig.name} onClick={() => updateChallenge({...userData.challengeConfig, isConfigured: true})} className="w-full bg-orange-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">Start <ArrowRight className="w-5 h-5"/></button>
-                  </div>
-                </Card>
-              ) : (
-                <Card className="bg-neutral-900 border-neutral-800">
-                  <div className="flex justify-between items-center mb-6 pb-4 border-b border-neutral-800">
-                    <div className="flex items-center gap-4"><div className="p-3 bg-rose-600 rounded-2xl"><Flame className="w-8 h-8 text-white"/></div><div><h2 className="text-2xl font-bold text-white">{userData.challengeConfig.name}</h2><p className="text-rose-300 text-sm">{userData.challengeConfig.reward}</p></div></div>
-                    <div className="text-right"><div className="text-3xl font-bold text-white">{userData.challengeProgress.filter(Boolean).length}/30</div><button onClick={() => updateChallenge({...userData.challengeConfig, isConfigured: false})} className="text-neutral-500 text-xs mt-1">Editează</button></div>
-                  </div>
-                  <div className="grid grid-cols-6 md:grid-cols-10 gap-2">
-                    {userData.challengeProgress.map((done, idx) => (
-                      <button key={idx} onClick={() => { const newProg = [...userData.challengeProgress]; newProg[idx] = !newProg[idx]; updateChallenge(undefined, newProg); }} className={`aspect-square rounded-lg flex items-center justify-center font-bold transition ${done ? 'bg-rose-600 text-white' : 'bg-neutral-800 text-neutral-500 hover:bg-neutral-700'}`}>{idx+1}</button>
-                    ))}
-                  </div>
-                  <div className="w-full h-1 bg-neutral-800 mt-6 rounded-full overflow-hidden"><div className="h-full bg-rose-500 transition-all" style={{width: `${(userData.challengeProgress.filter(Boolean).length/30)*100}%`}}></div></div>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'mindfulness' && (
-            <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
-              <div className="text-center"><h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Mindfulness</h1></div>
-              <div className="grid md:grid-cols-2 gap-8">
-                <Card className="flex flex-col items-center justify-center min-h-[350px] bg-gradient-to-b from-cyan-50 to-blue-50 dark:from-neutral-900 dark:to-black">
-                  <div className={`w-40 h-40 rounded-full bg-gradient-to-tr from-cyan-400 to-blue-500 flex items-center justify-center text-white text-xl font-bold shadow-2xl transition-all ${breathingScale} ${breathingDuration}`}>{breathingPhase}</div>
-                  <button onClick={() => setIsBreathing(!isBreathing)} className={`mt-8 px-8 py-3 rounded-xl font-bold ${isBreathing ? 'bg-slate-200 dark:bg-neutral-800 text-slate-600' : 'bg-cyan-600 text-white'}`}>{isBreathing ? 'Stop' : 'Start Respirație'}</button>
-                </Card>
-                <Card className="bg-gradient-to-b from-rose-50 to-pink-50 dark:from-neutral-900 dark:to-black">
-                  <div className="flex items-center gap-2 mb-4"><Heart className="w-6 h-6 text-rose-500 fill-rose-500"/><h2 className="text-xl font-bold text-rose-900 dark:text-white">Jurnal Recunoștință</h2></div>
-                  <div className="space-y-3">
-                    {gratitudeLog.map((val, idx) => (<input key={idx} value={val} onChange={e => { const n = [...gratitudeLog]; n[idx] = e.target.value; setGratitudeLog(n); }} placeholder={`${idx+1}. Sunt recunoscător pentru...`} className="w-full p-3 bg-white dark:bg-neutral-900 border border-rose-100 dark:border-neutral-800 rounded-xl text-slate-700 dark:text-white"/>))}
-                  </div>
-                  <button onClick={saveJournalEntry} className="w-full mt-4 bg-rose-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"><Book className="w-4 h-4"/> Salvează în Cloud</button>
-                </Card>
-              </div>
-              {userData.journalHistory.length > 0 && (
-                <div><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-4">Memorii</h3>
-                  <div className="grid md:grid-cols-3 gap-4">{userData.journalHistory.slice(0,6).map(entry => (<Card key={entry.id}><p className="font-bold text-slate-800 dark:text-white text-sm mb-2">{entry.date}</p><ul className="space-y-1">{entry.entries.map((item,i) => (<li key={i} className="text-sm text-slate-600 dark:text-neutral-400">• {item}</li>))}</ul></Card>))}</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'knowledge' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="bg-indigo-900 text-white p-10 rounded-3xl"><h2 className="text-3xl font-bold mb-2">Biblioteca</h2><p className="text-indigo-200">Cunoștințe esențiale pentru biohacking.</p></div>
-              {Object.entries(knowledgeBase).map(([cat, items]) => (<div key={cat}><h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize mb-4 mt-6">{cat}</h3><div className="grid md:grid-cols-2 gap-4">{items.map((item, i) => (<Card key={i}><h4 className="font-bold text-slate-800 dark:text-white mb-2">{item.title}</h4><p className="text-sm text-slate-600 dark:text-neutral-400">{item.content}</p></Card>))}</div></div>))}
-            </div>
-          )}
-
-          {activeTab === 'profile' && (
-            <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
-              <div className="relative"><div className="h-32 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-3xl"></div>
-                <div className="bg-white dark:bg-neutral-950 rounded-b-3xl border border-slate-100 dark:border-neutral-800 p-6 pt-0">
-                  <div className="flex flex-col md:flex-row items-center md:items-end -mt-12 mb-4 gap-4">
-                    <div className="w-24 h-24 bg-slate-100 dark:bg-neutral-900 rounded-full border-4 border-white dark:border-neutral-950 flex items-center justify-center"><User className="w-10 h-10 text-slate-300 dark:text-neutral-600"/></div>
-                    <div className="text-center md:text-left flex-1"><h1 className="text-2xl font-bold text-slate-800 dark:text-white">{userData.profile?.name}</h1><p className="text-slate-500 text-sm">{currentUser?.email}</p></div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 border-t border-slate-100 dark:border-neutral-800 pt-6 text-center">
-                    <div><div className="font-bold text-xl text-slate-800 dark:text-white">{score}</div><div className="text-xs text-slate-400">Scor</div></div>
-                    <div><div className="font-bold text-xl text-slate-800 dark:text-white">{userData.customHabits.length}</div><div className="text-xs text-slate-400">Protocoale</div></div>
-                    <div><div className="font-bold text-xl text-slate-800 dark:text-white">{userData.challengeProgress.filter(Boolean).length}</div><div className="text-xs text-slate-400">Zile Provocare</div></div>
-                  </div>
-                </div>
-              </div>
-              <div><h3 className="font-bold text-slate-800 dark:text-white mb-4">Protocoale Active</h3>
-                {userData.customHabits.length === 0 ? <p className="text-slate-500 text-center p-8 bg-slate-50 dark:bg-neutral-900 rounded-2xl">Niciun protocol.</p> : (
-                  <div className="space-y-3">{userData.customHabits.map(h => (<div key={h.id} className="bg-white dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800 flex justify-between items-center"><div><p className="font-bold text-slate-800 dark:text-white">{h.what}</p><p className="text-xs text-slate-500">{h.when}</p></div><button onClick={() => removeHabit(h.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-5 h-5"/></button></div>))}</div>
-                )}
-              </div>
-              <Card>
-                <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Settings className="w-5 h-5"/> Setări</h3>
-                <div className="space-y-4">
-                  <div onClick={toggleDarkMode} className="flex justify-between items-center p-2 hover:bg-slate-50 dark:hover:bg-neutral-900 rounded-lg cursor-pointer"><span className="text-slate-700 dark:text-neutral-200">Mod Întunecat</span><div className={`w-10 h-5 rounded-full relative ${darkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${darkMode ? 'left-6' : 'left-1'}`}></div></div></div>
-                  <div className="flex justify-between items-center p-2"><span className="text-slate-700 dark:text-neutral-200">Cloud Sync</span><span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Activ</span></div>
-                  <div className="pt-4 border-t border-slate-100 dark:border-neutral-800"><button onClick={handleLogout} className="text-red-500 text-sm font-bold flex items-center gap-2 p-2 w-full hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><LogOut className="w-4 h-4"/> Deconectare</button></div>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {activeTab === 'ai-coach' && (
-            <div className="h-[80vh] flex flex-col bg-white dark:bg-neutral-950 rounded-3xl shadow-lg border border-slate-100 dark:border-neutral-800 max-w-4xl mx-auto animate-fade-in">
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white rounded-t-3xl"><div className="flex items-center gap-4"><div className="p-3 bg-white/20 rounded-xl"><Zap className="w-6 h-6"/></div><div><h2 className="font-bold text-lg">BioSync AI</h2><p className="text-xs text-indigo-100">Asistentul tău personal</p></div></div></div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50 dark:bg-black">
-                {chatHistory.length === 0 && <div className="flex flex-col items-center justify-center h-full text-slate-400"><Sparkles className="w-16 h-16 mb-4 text-indigo-200 dark:text-neutral-800"/><p>Cum te pot ajuta?</p></div>}
-                {chatHistory.map((m, i) => (<div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`p-4 rounded-2xl max-w-[80%] text-sm ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-bl-none'}`}>{m.content}</div></div>))}
-                {isTyping && <div className="flex justify-start"><div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 px-4 py-3 rounded-2xl flex gap-1"><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span></div></div>}
-                <div ref={chatEndRef}/>
-              </div>
-              <div className="p-4 bg-white dark:bg-neutral-950 border-t border-slate-100 dark:border-neutral-800 rounded-b-3xl">
-                <div className="flex gap-3 bg-slate-50 dark:bg-neutral-900 p-2 rounded-2xl border border-slate-200 dark:border-neutral-800">
-                  <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} placeholder="Scrie mesajul..." className="flex-1 bg-transparent px-4 py-2 text-sm outline-none text-slate-800 dark:text-white"/>
-                  <button onClick={handleSendMessage} className="bg-indigo-600 text-white p-3 rounded-xl"><Send className="w-5 h-5"/></button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <footer className="mt-16 mb-8 py-8 border-t border-slate-200 dark:border-neutral-800 text-center">
-            <div className="flex flex-col items-center gap-2">
-              <div className="flex items-center gap-2 text-slate-400 text-sm"><Heart className="w-4 h-4 text-rose-400 fill-rose-400"/><span>Creat cu pasiune de <strong className="text-slate-600 dark:text-neutral-300">Cristian Puravu</strong></span></div>
-              <p className="text-xs text-slate-400">© {new Date().getFullYear()} BioSync Pro</p>
-            </div>
-          </footer>
+            </footer>
         </div>
       </main>
     </div>
