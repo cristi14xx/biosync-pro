@@ -694,7 +694,7 @@ export default function App() {
             <div>
                 <div className="flex items-center gap-4 mb-4">
                     {['😞', '😐', '🙂', '🤩'].map((m, idx) => (
-                        <button key={idx} onClick={() => setMoodValue(idx)} className={`text-2xl hover:scale-125 transition ${mood === idx ? 'scale-125 drop-shadow-glow' : 'opacity-50'}`}>{m}</button>
+                        <button key={idx} onClick={() => setMoodValue(idx)} className={`text-2xl hover:scale-125 transition ${userData.mood === idx ? 'scale-125 drop-shadow-glow' : 'opacity-50'}`}>{m}</button>
                     ))}
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white">Salut, {userData.profile?.name || 'Oaspete'}!</h1>
@@ -708,10 +708,17 @@ export default function App() {
                     </button>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex gap-4 flex-wrap">
                     <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
                         <Droplets className="w-4 h-4 text-blue-400"/>
                         <span className="font-bold text-neutral-200">{userData.waterIntake} / {userData.waterGoal} ml</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {[250, 500].map(amt => (
+                        <button key={amt} onClick={() => addWater(amt)} className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-lg text-sm font-bold hover:bg-blue-500/30 transition">
+                          +{amt}ml
+                        </button>
+                      ))}
                     </div>
                     <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
                         <Zap className="w-4 h-4 text-amber-400"/>
@@ -972,7 +979,7 @@ export default function App() {
                                       placeholder="ex: Meditație la 6 AM..." 
                                       className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white placeholder-indigo-200/50 focus:ring-2 focus:ring-orange-400 outline-none transition"
                                       value={userData.challengeConfig.name}
-                                      onChange={(e) => updateChallengeConfig({...challengeConfig, name: e.target.value})}
+                                      onChange={(e) => updateChallengeConfig({...userData.challengeConfig, name: e.target.value})}
                                   />
                               </div>
                               <div>
@@ -981,12 +988,12 @@ export default function App() {
                                       placeholder="ex: Mă voi simți invincibil..." 
                                       className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white placeholder-indigo-200/50 focus:ring-2 focus:ring-orange-400 outline-none transition"
                                       value={userData.challengeConfig.reward}
-                                      onChange={(e) => updateChallengeConfig({...challengeConfig, reward: e.target.value})}
+                                      onChange={(e) => updateChallengeConfig({...userData.challengeConfig, reward: e.target.value})}
                                   />
                               </div>
                               <button 
                                   disabled={!userData.challengeConfig.name}
-                                  onClick={() => updateChallengeConfig({...challengeConfig, isConfigured: true})}
+                                  onClick={() => updateChallengeConfig({...userData.challengeConfig, isConfigured: true})}
                                   className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-orange-500/30 flex justify-center items-center gap-2 mt-4"
                               >
                                   Start Aventură <ArrowRight className="w-5 h-5"/>
@@ -1023,7 +1030,7 @@ export default function App() {
                               <div className="text-xs text-neutral-500 font-medium uppercase tracking-wider mt-1">Zile Rămase</div>
                           </div>
                           <button 
-                              onClick={() => updateChallengeConfig({...challengeConfig, isConfigured: false})} 
+                              onClick={() => updateChallengeConfig({...userData.challengeConfig, isConfigured: false})} 
                               className="p-2 bg-neutral-800 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-700 transition ml-2"
                               title="Editează Provocarea"
                           >
@@ -1039,7 +1046,7 @@ export default function App() {
                               <button 
                                   key={idx} 
                                   onClick={() => {
-                                      const newProg = [...challengeProgress];
+                                      const newProg = [...userData.challengeProgress];
                                       newProg[idx] = !newProg[idx];
                                       updateChallengeProgress(newProg);
                                       if(!newProg[idx]) return; 
