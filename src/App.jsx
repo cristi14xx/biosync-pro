@@ -50,32 +50,26 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-// --- Firebase Imports (Mock for Preview / Real for Prod) ---
-// Notă: Asigură-te că ai fișierul firebase.js configurat corect dacă vrei persistență reală.
-// Pentru acest demo, voi simula auth și db pentru a garanta că UI-ul merge.
-// În producție, decomentează importurile reale.
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
+// Firebase imports
+import { auth, db } from './firebase';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-// --- Firebase Configuration Placeholder ---
-// Înlocuiește cu config-ul tău real din Firebase Console
-// La începutul fișierului, după celelalte importuri:
-import { auth, db } from './firebase.js';
-
-// --- API Key Configuration ---
-// NOTĂ PENTRU PUBLICARE (VERCEL):
-// 1. Când urci aplicația, șterge cele două slash-uri (//) din fața liniei de mai jos:
-// const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
-// 2. Și pune slash-uri (//) în fața liniei de mai jos (cea cu ""):
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
+// --- API Key Configuration (uses environment variable) ---
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 // --- Funcție Helper pentru Gemini API ---
 const callGeminiAPI = async (prompt, systemInstruction = "") => {
-  if (!apiKey) return "⚠️ Cheia API lipsește. Configurează VITE_GEMINI_API_KEY în Vercel.";
+  if (!apiKey) return "⚠️ Cheia API lipsește. Configurează VITE_GEMINI_API_KEY.";
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -196,7 +190,6 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false);
 
   // --- User Data from Firebase ---
-  // FIX: Inițializăm cu date default sigure pentru a preveni erorile de 'null'
   const [userData, setUserData] = useState(getDefaultUserData());
   const [dataLoading, setDataLoading] = useState(true);
 
@@ -213,7 +206,8 @@ export default function App() {
 
   // Obiective & Scor
   const [score, setScore] = useState(0);
-  
+  const [lastBreak, setLastBreak] = useState(Date.now()); 
+
   // Local-only states (not synced)
   const [newHabit, setNewHabit] = useState({ what: "", when: "", where: "" });
 
@@ -245,17 +239,6 @@ export default function App() {
 
   // --- Firebase Auth Listener ---
   useEffect(() => {
-    // Simulăm auth loading pentru demo dacă firebase nu e configurat
-    if (!auth) {
-        const timer = setTimeout(() => {
-            // Demo user
-            setCurrentUser({ uid: 'demo-user', displayName: 'Oaspete' });
-            setAuthLoading(false);
-            setDataLoading(false);
-        }, 1000);
-        return () => clearTimeout(timer);
-    }
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setAuthLoading(false);
@@ -269,7 +252,7 @@ export default function App() {
 
   // --- Load User Data from Firestore ---
   useEffect(() => {
-    if (!currentUser || !db) return;
+    if (!currentUser) return;
 
     setDataLoading(true);
     const userDocRef = doc(db, 'users', currentUser.uid);
@@ -303,7 +286,7 @@ export default function App() {
         setShowDisclaimer(!data.disclaimerAccepted);
       } else {
         const defaultData = getDefaultUserData();
-        defaultData.profile.name = currentUser.displayName || 'Oaspete';
+        defaultData.profile.name = currentUser.displayName || '';
         setDoc(userDocRef, defaultData);
         setUserData(defaultData);
         setShowDisclaimer(true);
@@ -316,11 +299,7 @@ export default function App() {
 
   // --- Save User Data to Firestore ---
   const saveUserData = async (newData) => {
-    if (!currentUser || !db) {
-        // Fallback local state update for demo
-        setUserData(newData);
-        return;
-    }
+    if (!currentUser) return;
     try {
       const userDocRef = doc(db, 'users', currentUser.uid);
       await setDoc(userDocRef, newData, { merge: true });
@@ -504,7 +483,6 @@ export default function App() {
   // --- Firebase Auth Handlers ---
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!auth) return;
     setAuthError('');
     const formData = new FormData(e.target);
     const email = formData.get('email');
@@ -538,7 +516,6 @@ export default function App() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!auth) return;
     setAuthError('');
     const formData = new FormData(e.target);
     const email = formData.get('email');
@@ -554,7 +531,6 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    if (!auth) return;
     try {
       await signOut(auth);
       triggerNotification("Deconectat", "Ne vedem curând!", "info");
@@ -718,7 +694,7 @@ export default function App() {
             <div>
                 <div className="flex items-center gap-4 mb-4">
                     {['😞', '😐', '🙂', '🤩'].map((m, idx) => (
-                        <button key={idx} onClick={() => setMoodValue(idx)} className={`text-2xl hover:scale-125 transition ${userData.mood === idx ? 'scale-125 drop-shadow-glow' : 'opacity-50'}`}>{m}</button>
+                        <button key={idx} onClick={() => setMoodValue(idx)} className={`text-2xl hover:scale-125 transition ${mood === idx ? 'scale-125 drop-shadow-glow' : 'opacity-50'}`}>{m}</button>
                     ))}
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white">Salut, {userData.profile?.name || 'Oaspete'}!</h1>
@@ -732,17 +708,10 @@ export default function App() {
                     </button>
                 </div>
 
-                <div className="flex gap-4 flex-wrap">
+                <div className="flex gap-4">
                     <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
                         <Droplets className="w-4 h-4 text-blue-400"/>
                         <span className="font-bold text-neutral-200">{userData.waterIntake} / {userData.waterGoal} ml</span>
-                    </div>
-                    <div className="flex gap-2">
-                      {[250, 500].map(amt => (
-                        <button key={amt} onClick={() => addWater(amt)} className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-lg text-sm font-bold hover:bg-blue-500/30 transition">
-                          +{amt}ml
-                        </button>
-                      ))}
                     </div>
                     <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
                         <Zap className="w-4 h-4 text-amber-400"/>
@@ -1003,7 +972,7 @@ export default function App() {
                                       placeholder="ex: Meditație la 6 AM..." 
                                       className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white placeholder-indigo-200/50 focus:ring-2 focus:ring-orange-400 outline-none transition"
                                       value={userData.challengeConfig.name}
-                                      onChange={(e) => updateChallengeConfig({...userData.challengeConfig, name: e.target.value})}
+                                      onChange={(e) => updateChallengeConfig({...challengeConfig, name: e.target.value})}
                                   />
                               </div>
                               <div>
@@ -1012,12 +981,12 @@ export default function App() {
                                       placeholder="ex: Mă voi simți invincibil..." 
                                       className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white placeholder-indigo-200/50 focus:ring-2 focus:ring-orange-400 outline-none transition"
                                       value={userData.challengeConfig.reward}
-                                      onChange={(e) => updateChallengeConfig({...userData.challengeConfig, reward: e.target.value})}
+                                      onChange={(e) => updateChallengeConfig({...challengeConfig, reward: e.target.value})}
                                   />
                               </div>
                               <button 
                                   disabled={!userData.challengeConfig.name}
-                                  onClick={() => updateChallengeConfig({...userData.challengeConfig, isConfigured: true})}
+                                  onClick={() => updateChallengeConfig({...challengeConfig, isConfigured: true})}
                                   className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-orange-500/30 flex justify-center items-center gap-2 mt-4"
                               >
                                   Start Aventură <ArrowRight className="w-5 h-5"/>
@@ -1054,7 +1023,7 @@ export default function App() {
                               <div className="text-xs text-neutral-500 font-medium uppercase tracking-wider mt-1">Zile Rămase</div>
                           </div>
                           <button 
-                              onClick={() => updateChallengeConfig({...userData.challengeConfig, isConfigured: false})} 
+                              onClick={() => updateChallengeConfig({...challengeConfig, isConfigured: false})} 
                               className="p-2 bg-neutral-800 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-700 transition ml-2"
                               title="Editează Provocarea"
                           >
@@ -1070,7 +1039,7 @@ export default function App() {
                               <button 
                                   key={idx} 
                                   onClick={() => {
-                                      const newProg = [...userData.challengeProgress];
+                                      const newProg = [...challengeProgress];
                                       newProg[idx] = !newProg[idx];
                                       updateChallengeProgress(newProg);
                                       if(!newProg[idx]) return; 
@@ -1107,6 +1076,306 @@ export default function App() {
               </Card>
           )}
       </div>
+  );
+
+  const renderMindfulness = () => (
+    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-24 md:pb-0">
+        <div className="text-center mb-10">
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Sanctuarul Minții</h1>
+            <p className="text-slate-500 dark:text-neutral-400">Echilibru interior prin respirație și recunoștință.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="flex flex-col items-center justify-center min-h-[400px] bg-gradient-to-b from-cyan-50 to-blue-50 dark:from-neutral-900 dark:to-black border-cyan-100 dark:border-neutral-800 relative overflow-hidden">
+                <div className="absolute top-4 right-4 bg-white dark:bg-neutral-800 px-3 py-1 rounded-full text-xs font-bold text-cyan-600 dark:text-cyan-400 shadow-sm flex items-center gap-1">
+                    <Wind className="w-3 h-3"/> 4-7-8 (Relaxare)
+                </div>
+                <div 
+                    className={`w-48 h-48 rounded-full bg-gradient-to-tr from-cyan-400 to-blue-500 flex items-center justify-center text-white text-2xl font-bold shadow-2xl shadow-cyan-400/40 transition-all ease-in-out ${breathingScale} ${breathingDuration}`}
+                >
+                    {breathingPhase}
+                </div>
+                <p className="mt-8 text-slate-600 dark:text-neutral-400 text-center max-w-xs text-sm">
+                    {isBreathing 
+                        ? (breathingPhase === 'Inspiră' ? "Umple plămânii încet..." : breathingPhase === 'Ține' ? "Păstrează aerul..." : "Eliberează tot aerul...")
+                        : "Protocol 4-7-8: Inspiră 4s, Ține 7s, Expiră 8s. Reduce anxietatea rapid."}
+                </p>
+                <button 
+                    onClick={() => setIsBreathing(!isBreathing)}
+                    className={`mt-6 px-8 py-3 rounded-xl font-bold transition shadow-lg ${isBreathing ? 'bg-slate-200 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                    {isBreathing ? 'Oprește' : 'Începe Respirația'}
+                </button>
+            </Card>
+
+            <Card className="bg-gradient-to-b from-rose-50 to-pink-50 dark:from-neutral-900 dark:to-black border-rose-100 dark:border-neutral-800">
+                <div className="flex items-center gap-2 mb-6">
+                    <Heart className="w-6 h-6 text-rose-500 fill-rose-500"/>
+                    <h2 className="text-xl font-bold text-rose-900 dark:text-neutral-200">Jurnal de Recunoștință</h2>
+                </div>
+                <p className="text-sm text-rose-800 dark:text-neutral-400 mb-6 opacity-80">Ce te-a făcut să zâmbești astăzi? Scrie sau alege o sugestie.</p>
+                <div className="space-y-6">
+                    {gratitudeLog.map((val, idx) => (
+                        <div key={idx}>
+                            <div className="relative">
+                                <span className="absolute left-4 top-3.5 text-rose-300 dark:text-neutral-500 font-bold">{idx + 1}.</span>
+                                <input 
+                                    value={val}
+                                    onChange={(e) => {
+                                        const newLog = [...gratitudeLog];
+                                        newLog[idx] = e.target.value;
+                                        setGratitudeLog(newLog);
+                                    }}
+                                    placeholder="Sunt recunoscător pentru..."
+                                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-neutral-900 border border-rose-100 dark:border-neutral-800 rounded-xl text-slate-700 dark:text-neutral-200 focus:ring-2 focus:ring-rose-300 outline-none transition placeholder-rose-200 dark:placeholder-neutral-600"
+                                />
+                            </div>
+                            {val === "" && (
+                                <div className="flex gap-2 mt-2 flex-wrap">
+                                    {['Un apus frumos', 'O cafea bună', 'Sănătatea mea', 'Un prieten drag', 'Muzica preferată'].map(suggestion => (
+                                        <button 
+                                            key={suggestion}
+                                            onClick={() => {
+                                                const newLog = [...gratitudeLog];
+                                                newLog[idx] = suggestion;
+                                                setGratitudeLog(newLog);
+                                            }}
+                                            className="text-xs bg-white/50 dark:bg-neutral-900/50 px-3 py-1 rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-neutral-800 transition"
+                                        >
+                                            {suggestion}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+                <button onClick={saveJournalEntry} className="w-full mt-6 bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
+                    <Book className="w-4 h-4"/> Salvează în Jurnal
+                </button>
+            </Card>
+        </div>
+
+        {userData.journalHistory.length > 0 && (
+            <div className="mt-12">
+                <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                    <Book className="w-6 h-6 text-indigo-500"/> Memoriile Tale
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {userData.journalHistory.map((entry) => (
+                        <Card key={entry.id} className="relative group hover:shadow-md transition">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <div className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                        <Calendar className="w-4 h-4 text-indigo-500"/> {entry.date}
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-neutral-500 flex items-center gap-1 mt-1">
+                                        <Clock className="w-3 h-3"/> {entry.time}
+                                    </div>
+                                </div>
+                            </div>
+                            <ul className="space-y-2">
+                                {entry.entries.map((item, idx) => (
+                                    <li key={idx} className="text-sm text-slate-600 dark:text-neutral-300 flex items-start gap-2">
+                                        {/* DEFENSIVE CHECK: Ensure item is a string */}
+                                        <span className="text-rose-400 mt-1">•</span> {typeof item === 'string' ? item : JSON.stringify(item)}
+                                    </li>
+                                ))}
+                            </ul>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        )}
+    </div>
+  );
+
+  const renderProfile = () => (
+    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in pb-24 md:pb-0">
+        <div className="relative">
+            <div className="h-32 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-3xl"></div>
+            <div className="bg-white dark:bg-neutral-950 rounded-b-3xl shadow-sm border border-slate-100 dark:border-neutral-800 p-6 pt-0 relative">
+                <div className="flex flex-col md:flex-row items-center md:items-end -mt-12 mb-4 gap-4">
+                    <div className="w-24 h-24 bg-slate-100 dark:bg-neutral-900 rounded-full border-4 border-white dark:border-neutral-950 shadow-md flex items-center justify-center overflow-hidden">
+                        <User className="w-10 h-10 text-slate-300 dark:text-neutral-600"/>
+                    </div>
+                    <div className="text-center md:text-left flex-1">
+                        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{userData.profile?.name || 'Utilizator'}</h1>
+                        <p className="text-slate-500 dark:text-neutral-400 text-sm">Biohacker Level 3 • {userData.profile?.age || 0} ani</p>
+                        <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">{currentUser?.email}</p>
+                    </div>
+                    <button onClick={shareApp} className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition flex items-center gap-2">
+                        <Share2 className="w-4 h-4"/> Recomandă App
+                    </button>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 border-t border-slate-100 dark:border-neutral-800 pt-6 text-center">
+                    <div>
+                        <div className="font-bold text-xl text-slate-800 dark:text-white">{score}</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-wide">Scor Azi</div>
+                    </div>
+                    <div>
+                        <div className="font-bold text-xl text-slate-800 dark:text-white">{userData.customHabits.length}</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-wide">Protocoale</div>
+                    </div>
+                    <div>
+                        <div className="font-bold text-xl text-slate-800 dark:text-white">{userData.challengeProgress.filter(Boolean).length}</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-wide">Zile Provocare</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-lg">
+                <Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400"/> Protocoalele Tale Active
+            </h3>
+            {userData.customHabits.length === 0 ? (
+                <div className="text-center p-8 bg-slate-50 dark:bg-neutral-900 rounded-2xl border border-dashed border-slate-300 dark:border-neutral-700">
+                    <p className="text-slate-500 dark:text-neutral-400">Nu ai definit încă niciun protocol personalizat.</p>
+                    <button onClick={() => setActiveTab('dashboard')} className="text-indigo-600 dark:text-indigo-400 font-bold text-sm mt-2 hover:underline">Mergi la Laborator</button>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {userData.customHabits.map((habit) => (
+                        <div key={habit.id} className="bg-white dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between shadow-sm hover:shadow-md transition">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold">
+                                    {habit.what[0].toUpperCase()}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-800 dark:text-white">{habit.what}</div>
+                                    <div className="text-xs text-slate-500 dark:text-neutral-400 flex gap-2">
+                                        <span className="bg-slate-100 dark:bg-neutral-900 px-2 py-0.5 rounded text-slate-500 dark:text-neutral-400">{habit.when}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => removeHabit(habit.id)} className="p-2 text-slate-300 hover:text-red-500 transition">
+                                <Trash2 className="w-5 h-5"/>
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+        
+         <div>
+            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-lg">
+                <Settings className="w-5 h-5 text-slate-600 dark:text-neutral-400"/> Setări Cont
+            </h3>
+            <Card className="space-y-4">
+                <div onClick={toggleDarkMode} className="flex justify-between items-center p-2 hover:bg-slate-50 dark:hover:bg-neutral-900 rounded-lg transition cursor-pointer">
+                    <span className="text-slate-700 dark:text-neutral-200 font-medium">Mod Întunecat</span>
+                    <div className={`w-10 h-5 rounded-full relative transition-colors duration-300 ${darkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm transition-all duration-300 ${darkMode ? 'left-6' : 'left-1'}`}></div>
+                    </div>
+                </div>
+                <div className="flex justify-between items-center p-2">
+                    <span className="text-slate-700 dark:text-neutral-200 font-medium">Sincronizare Cloud</span>
+                    <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full font-bold flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3"/> Activ
+                    </span>
+                </div>
+                <div className="pt-4 border-t border-slate-100 dark:border-neutral-800">
+                     <button onClick={handleLogout} className="text-red-500 text-sm font-bold flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition w-full">
+                        <LogOut className="w-4 h-4"/> Deconectare
+                    </button>
+                </div>
+            </Card>
+         </div>
+    </div>
+  );
+
+  const renderKnowledge = () => (
+    <div className="space-y-6 pb-24 md:pb-0 animate-fade-in">
+        <div className="bg-indigo-900 dark:bg-black text-white p-10 rounded-3xl relative overflow-hidden shadow-xl border border-transparent dark:border-neutral-800">
+            <div className="relative z-10 max-w-2xl">
+                <h2 className="text-3xl font-bold mb-4">Cunoașterea este Putere</h2>
+                <p className="text-indigo-200 text-lg">Explorează mecanismele biologice care îți controlează energia, fericirea și productivitatea.</p>
+            </div>
+            <BookOpen className="absolute -right-6 -bottom-6 w-48 h-48 text-indigo-950 dark:text-neutral-900 opacity-50" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500 rounded-full blur-[100px] opacity-20"></div>
+        </div>
+        {Object.entries(knowledgeBase).map(([category, items]) => (
+            <div key={category}>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize mb-4 ml-2 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-indigo-500 rounded-full"></span> {category}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {items.map((item, idx) => (
+                        <Card key={idx} className="hover:shadow-lg transition hover:-translate-y-1 duration-300 border-l-4 border-l-transparent hover:border-l-indigo-500">
+                            <h4 className="font-bold text-slate-800 dark:text-white mb-2">{item.title}</h4>
+                            <p className="text-sm text-slate-600 dark:text-neutral-400 leading-relaxed">{item.content}</p>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        ))}
+    </div>
+  );
+
+  const renderAICoach = () => (
+    <div className="h-[85vh] flex flex-col bg-white dark:bg-neutral-950 rounded-3xl shadow-2xl overflow-hidden animate-fade-in border border-slate-100 dark:border-neutral-800 max-w-4xl mx-auto">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-neutral-900 dark:to-neutral-950 p-6 text-white flex justify-between items-center shadow-md z-10 dark:border-b dark:border-neutral-800">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl"><Zap className="w-6 h-6"/></div>
+                <div>
+                    <h2 className="font-bold text-lg">BioSync Mentor</h2>
+                    <p className="text-xs text-indigo-100 dark:text-neutral-400 font-medium">Inteligență Artificială & Neuroștiință</p>
+                </div>
+            </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 dark:bg-black">
+            {chatHistory.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                    <Sparkles className="w-16 h-16 mb-4 text-indigo-200 dark:text-neutral-800 animate-pulse"/>
+                    <p className="font-medium text-lg text-slate-600 dark:text-neutral-500">Cum te pot ajuta astăzi?</p>
+                    <div className="flex gap-2 mt-4">
+                        <span className="text-xs bg-white dark:bg-neutral-900 px-3 py-1 rounded-full border border-slate-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400">Somn</span>
+                        <span className="text-xs bg-white dark:bg-neutral-900 px-3 py-1 rounded-full border border-slate-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400">Stres</span>
+                        <span className="text-xs bg-white dark:bg-neutral-900 px-3 py-1 rounded-full border border-slate-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400">Nutriție</span>
+                    </div>
+                </div>
+            )}
+            {chatHistory.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`p-5 rounded-2xl max-w-[85%] text-sm leading-relaxed shadow-sm ${
+                        m.role === 'user' 
+                        ? 'bg-indigo-600 text-white rounded-br-none' 
+                        : 'bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-bl-none'
+                    }`}>
+                        {m.content}
+                    </div>
+                </div>
+            ))}
+            {isTyping && (
+                 <div className="flex justify-start">
+                    <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 px-4 py-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1 items-center">
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span>
+                    </div>
+                </div>
+            )}
+            <div ref={chatEndRef} />
+        </div>
+
+        <div className="p-4 bg-white dark:bg-neutral-950 border-t border-slate-100 dark:border-neutral-800">
+            <div className="flex gap-3 bg-slate-50 dark:bg-neutral-900 p-2 rounded-2xl border border-slate-200 dark:border-neutral-800 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-neutral-700 transition-all">
+                <input 
+                    value={chatInput} 
+                    onChange={e => setChatInput(e.target.value)} 
+                    onKeyPress={e => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Scrie mesajul tău..." 
+                    className="flex-1 bg-transparent border-none px-4 py-2 text-sm focus:outline-none text-slate-800 dark:text-neutral-200 placeholder-slate-400 dark:placeholder-neutral-600"
+                />
+                <button onClick={handleSendMessage} className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl transition shadow-md">
+                    <Send className="w-5 h-5"/>
+                </button>
+            </div>
+        </div>
+    </div>
   );
 
   // --- Main Render ---
