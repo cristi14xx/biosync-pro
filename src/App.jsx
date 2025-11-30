@@ -60,31 +60,15 @@ import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // --- Firebase Configuration Placeholder ---
 // Înlocuiește cu config-ul tău real din Firebase Console
-const firebaseConfig = {
-  apiKey: "API_KEY_AICI",
-  authDomain: "biosync.firebaseapp.com",
-  projectId: "biosync",
-  storageBucket: "biosync.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123456"
-};
-
-// Inițializare condițională (pentru a nu crăpa dacă nu e configurat)
-let auth, db;
-try {
-   const app = initializeApp(firebaseConfig);
-   auth = getAuth(app);
-   db = getFirestore(app);
-} catch (e) {
-   console.warn("Firebase nu este configurat complet. Aplicația va rula în mod demo.");
-}
+// La începutul fișierului, după celelalte importuri:
+import { auth, db } from './firebase.js';
 
 // --- API Key Configuration ---
 // NOTĂ PENTRU PUBLICARE (VERCEL):
 // 1. Când urci aplicația, șterge cele două slash-uri (//) din fața liniei de mai jos:
 // const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
 // 2. Și pune slash-uri (//) în fața liniei de mai jos (cea cu ""):
-const apiKey = ""; 
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
 
 // --- Funcție Helper pentru Gemini API ---
 const callGeminiAPI = async (prompt, systemInstruction = "") => {
