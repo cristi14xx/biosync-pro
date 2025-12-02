@@ -47,7 +47,13 @@ import {
   Lock,
   Eye,
   EyeOff,
-  AlertCircle
+  AlertCircle,
+  Snowflake,
+  PenTool,
+  RefreshCw,
+  Lightbulb,
+  Apple,
+  Scale
 } from 'lucide-react';
 
 // Firebase imports
@@ -63,6 +69,23 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // --- API Key Configuration (uses environment variable) ---
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+
+// --- Funcție Helper pentru curățare Markdown ---
+const cleanMarkdown = (text) => {
+  if (!text) return text;
+  return text
+    .replace(/\*\*\*(.*?)\*\*\*/g, '$1')  // ***bold italic***
+    .replace(/\*\*(.*?)\*\*/g, '$1')       // **bold**
+    .replace(/\*(.*?)\*/g, '$1')           // *italic*
+    .replace(/^### (.*$)/gm, '$1')         // ### headers
+    .replace(/^## (.*$)/gm, '$1')          // ## headers
+    .replace(/^# (.*$)/gm, '$1')           // # headers
+    .replace(/^\* /gm, '• ')               // bullet points
+    .replace(/^- /gm, '• ')                // bullet points
+    .replace(/`(.*?)`/g, '$1')             // `code`
+    .replace(/^\d+\. /gm, '')              // numbered lists (optional)
+    .trim();
+};
 
 // --- Funcție Helper pentru Gemini API ---
 const callGeminiAPI = async (prompt, systemInstruction = "") => {
@@ -81,51 +104,164 @@ const callGeminiAPI = async (prompt, systemInstruction = "") => {
     );
     if (!response.ok) throw new Error('API Error');
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Eroare la generare.";
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Eroare la generare.";
+    return cleanMarkdown(rawText);
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "Momentan nu pot accesa serverul AI.";
   }
 };
 
-// --- Baza de Date Studii ---
+// --- Baza de Date Studii (100+ idei bazate pe cercetări științifice) ---
 const knowledgeBase = {
   somn: [
     { title: 'Ciclurile REM', content: 'Somnul REM este crucial pentru stabilitate emoțională. Lipsa lui crește reactivitatea amigdalei cu 60%. (Matthew Walker)' },
     { title: 'Temperatura Optimă', content: '18.3°C este temperatura ideală în dormitor. Corpul trebuie să își scadă temperatura centrală cu 1°C pentru a iniția somnul.' },
     { title: 'Regula 10-3-2-1', content: 'Fără cofeină cu 10h înainte de culcare, fără mâncare cu 3h înainte, fără muncă cu 2h înainte, fără ecrane cu 1h înainte.' },
     { title: 'Lumina de Dimineață', content: 'Expunerea la soare în primele 30-60 min după trezire setează ceasul circadian și ajută la eliberarea melatoninei cu 16 ore mai târziu. (Huberman Lab)' },
-    { title: 'NSDR', content: 'Non-Sleep Deep Rest (sau Yoga Nidra) timp de 20 minute poate reface dopamina din ganglionii bazali și reduce oboseala la fel de eficient ca un pui de somn.' }
+    { title: 'NSDR', content: 'Non-Sleep Deep Rest (sau Yoga Nidra) timp de 20 minute poate reface dopamina din ganglionii bazali și reduce oboseala la fel de eficient ca un pui de somn.' },
+    { title: 'Somnul și Memoria', content: 'În timpul somnului profund, creierul consolidează memoria. O noapte de somn îmbunătățește retenția informațiilor cu 40%. (Harvard Medical School)' },
+    { title: 'Efectul Luminii Albastre', content: 'Lumina albastră de la ecrane suprimă melatonina cu până la 50%. Folosește filtre sau ochelari cu blocare a luminii albastre seara.' },
+    { title: 'Consistența Somnului', content: 'Variația orei de culcare cu mai mult de 1 oră crește riscul de boli cardiovasculare cu 27%. (Journal of the American Heart Association)' },
+    { title: 'Magneziu pentru Somn', content: 'Magneziul glicinat îmbunătățește calitatea somnului prin activarea sistemului nervos parasimpatic. Doza: 200-400mg seara.' },
+    { title: 'Pernele și Coloana', content: 'Înălțimea ideală a pernei depinde de poziția de dormit: 10-15cm pentru cei care dorm pe spate, 15-20cm pentru cei pe o parte.' },
+    { title: 'Cafeaua și Adenozina', content: 'Cafeaua blochează receptorii de adenozină. Timpul de înjumătățire este 5-6 ore, deci o cafea la 14:00 încă afectează somnul.' },
+    { title: 'Somnul de Weekend', content: 'Nu poți "recupera" somnul pierdut în weekend. Datoria de somn acumulată afectează metabolismul și cogniția permanent.' }
   ],
   nutritie: [
     { title: 'Glucoza și Energia', content: 'Ordinea mâncării contează: Fibre -> Proteine/Grăsimi -> Carbohidrați. Asta reduce vârful glicemic cu până la 73%. (Glucose Goddess)' },
     { title: 'Fereastra de Alimentare', content: 'Mâncatul într-o fereastră de 8-10 ore (Time Restricted Feeding) îmbunătățește sănătatea metabolică și activează genele longevității.' },
     { title: 'Hidratarea și Creierul', content: 'O deshidratare de doar 2% scade performanța cognitivă și memoria de scurtă durată. Apa cu puțină sare dimineața ajută la absorbție.' },
-    { title: 'Microbiomul', content: '95% din serotonină este produsă în intestin. Consumul de alimente fermentate (kefir, murături) scade inflamația sistemică.' }
+    { title: 'Microbiomul', content: '95% din serotonină este produsă în intestin. Consumul de alimente fermentate (kefir, murături) scade inflamația sistemică.' },
+    { title: 'Omega-3 și Creierul', content: 'Creierul este format 60% din grăsimi. Omega-3 (EPA/DHA) din pește reduce inflamația cerebrală și îmbunătățește memoria.' },
+    { title: 'Proteine la Micul Dejun', content: '30g proteine dimineața stabilizează glicemia toată ziua și reduce poftele de dulce cu 50%. (Journal of Nutrition)' },
+    { title: 'Fibrele și Longevitatea', content: 'Fiecare 10g de fibre consumate zilnic reduce riscul de mortalitate cu 10%. Ținta: 30-40g/zi.' },
+    { title: 'Polifenolii', content: 'Compușii din fructele de pădure, ceai verde și ciocolată neagră protejează celulele de stres oxidativ și îmbunătățesc fluxul sanguin cerebral.' },
+    { title: 'Zahărul Ascuns', content: 'Un iaurt cu fructe "sănătos" poate conține 20g zahăr - echivalentul a 5 lingurițe. Citește etichetele!' },
+    { title: 'Masticația', content: 'Mestecatul de 30 de ori per îmbucătură îmbunătățește digestia și reduce consumul caloric cu 15%. (American Journal of Clinical Nutrition)' },
+    { title: 'Curcuma și Inflamația', content: 'Curcumina are efecte antiinflamatorii comparabile cu ibuprofenul. Combină cu piper negru pentru absorbție de 2000% mai mare.' },
+    { title: 'Cafeaua și Metabolismul', content: 'Cafeaua crește rata metabolică cu 3-11%. Dar fără zahăr și frișcă - altfel anulezi beneficiile.' },
+    { title: 'Postul Intermitent', content: 'După 12-16 ore fără mâncare, corpul intră în autofagie - procesul de "curățare" celulară asociat cu longevitatea.' },
+    { title: 'Vitamina D', content: '40% din europeni au deficit de vitamina D. Aceasta afectează imunitatea, starea de spirit și sănătatea oaselor.' },
+    { title: 'Indicele Glicemic', content: 'Alimentele cu IG scăzut (<55) mențin energia stabilă. Orezul alb (IG 73) vs. quinoa (IG 53) - alegerea contează.' }
   ],
   focus: [
     { title: 'Deep Work', content: 'Capacitatea de concentrare profundă este rară. Multitasking-ul scade IQ-ul temporar cu 10 puncte, echivalentul unei nopți nedormite. (Cal Newport)' },
     { title: 'Regula celor 90 minute', content: 'Creierul funcționează în cicluri ultradiene de 90 minute. După un ciclu de focus intens, ai nevoie de 20 minute de odihnă.' },
     { title: 'Binaural Beats', content: 'Sunetele de 40Hz pot îmbunătăți concentrarea și memoria de lucru prin sincronizarea undelor cerebrale.' },
-    { title: 'Dopamine Detox', content: 'Reducerea stimulilor ieftini (social media, zahăr) resetează receptorii de dopamină, făcând munca grea să pară mai ușoară.' }
+    { title: 'Dopamine Detox', content: 'Reducerea stimulilor ieftini (social media, zahăr) resetează receptorii de dopamină, făcând munca grea să pară mai ușoară.' },
+    { title: 'Tehnica Pomodoro', content: '25 minute de muncă + 5 minute pauză. După 4 cicluri, pauză lungă de 15-30 min. Crește productivitatea cu 25%.' },
+    { title: 'Efectul Zeigarnik', content: 'Creierul reține mai bine sarcinile neterminate. Începe o sarcină grea înainte de pauză - subconștientul va lucra la ea.' },
+    { title: 'Mediul și Focusul', content: 'Un birou dezordonat reduce capacitatea de concentrare cu 40%. Minimalism = maximă productivitate.' },
+    { title: 'Cafeaua Strategică', content: 'Cafeaua este cea mai eficientă la 90-120 min după trezire, când cortizolul scade natural. (Andrew Huberman)' },
+    { title: 'Cold Exposure', content: 'Expunerea la frig (duș rece 2-3 min) crește dopamina cu 250% pentru 3 ore, îmbunătățind focusul și motivația.' },
+    { title: 'Muzica și Productivitatea', content: 'Muzica fără versuri (lo-fi, clasică, ambient) îmbunătățește focusul. Versurile activează centrii limbajului și distrag.' },
+    { title: 'Regula celor 2 Minute', content: 'Dacă o sarcină durează sub 2 minute, fă-o imediat. Amânarea consumă mai multă energie mentală decât executarea.' },
+    { title: 'Single-Tasking', content: 'Schimbarea între sarcini costă 23 de minute pentru a reveni la focusul inițial. Fă un singur lucru la un moment dat.' }
   ],
   fericire: [
     { title: 'Paradoxul Hedonic', content: 'Fericirea derivată din confort dispare rapid. Fericirea derivată din sens și conexiune (Eudaimonia) este durabilă.' },
     { title: 'Recunoștința', content: 'Notarea a 3 lucruri pozitive zilnic timp de 21 de zile rescrie tiparele neuronale spre optimism. (Shawn Achor)' },
     { title: 'Conexiunea Socială', content: 'Singurătatea cronică este echivalentă cu fumatul a 15 țigări pe zi din punct de vedere al riscului de mortalitate.' },
-    { title: 'Voluntariatul', content: '"Helper\'s High" este real. Actele de bunătate eliberează oxitocină și reduc stresul.' }
+    { title: 'Voluntariatul', content: '"Helper\'s High" este real. Actele de bunătate eliberează oxitocină și reduc stresul.' },
+    { title: 'Natura și Starea de Spirit', content: '20 de minute în natură scad cortizolul cu 21%. Japonezii numesc asta "Shinrin-yoku" (baia de pădure).' },
+    { title: 'Fluxul (Flow State)', content: 'Starea de flux apare când provocarea este cu 4% peste abilitățile tale. Prea ușor = plictiseală. Prea greu = anxietate.' },
+    { title: 'Exercițiul și Depresia', content: '30 de minute de mișcare moderată zilnic este la fel de eficient ca antidepresivele pentru depresia ușoară-moderată.' },
+    { title: 'Zâmbetul Forțat', content: 'Zâmbetul activează mușchii care trimit semnale pozitive creierului. Chiar și un zâmbet forțat îmbunătățește starea de spirit.' },
+    { title: 'Experiențe vs. Obiecte', content: 'Banii cheltuiți pe experiențe aduc mai multă fericire decât cei pe obiecte. Efectul durează mai mult în memorie.' },
+    { title: 'Meditația și Amigdala', content: '8 săptămâni de meditație zilnică reduc dimensiunea amigdalei (centrul fricii) și cresc cortexul prefrontal.' },
+    { title: 'Limitele Social Media', content: '30 min/zi pe social media este punctul optim. Peste acest prag, cresc anxietatea și depresia. (Journal of Social Psychology)' },
+    { title: 'Așteptările și Fericirea', content: 'Fericirea = Realitate - Așteptări. Reducerea așteptărilor nerealiste crește satisfacția vieții.' }
   ],
   longevitate: [
     { title: 'Hormesis', content: 'Stresul scurt și controlat (duș rece, saună, exerciții intense) activează mecanismele de reparare celulară și longevitate.' },
     { title: 'VO2 Max', content: 'Cel mai puternic predictor al longevității. Creșterea VO2 Max prin antrenamente cardio intense reduce riscul de mortalitate din toate cauzele.' },
-    { title: 'Grip Strength', content: 'Forța de prindere a mâinii este direct corelată cu sănătatea sistemului nervos și longevitatea funcțională la bătrânețe.' }
+    { title: 'Grip Strength', content: 'Forța de prindere a mâinii este direct corelată cu sănătatea sistemului nervos și longevitatea funcțională la bătrânețe.' },
+    { title: 'Sauna și Inima', content: '4-7 saune/săptămână reduc riscul de boli cardiovasculare cu 50% și mortalitatea din toate cauzele cu 40%. (Finnish Study)' },
+    { title: 'Restricția Calorică', content: 'Reducerea cu 15-20% a caloriilor fără malnutriție încetinește îmbătrânirea la nivel celular și crește durata de viață.' },
+    { title: 'Telomerii', content: 'Stresul cronic scurtează telomerii (capetele cromozomilor). Meditația și exercițiul pot încetini acest proces.' },
+    { title: 'Blue Zones', content: 'În zonele albastre (Okinawa, Sardinia), oamenii trăiesc 100+ ani. Secretul: mișcare naturală, sens, comunitate, dietă vegetală.' },
+    { title: 'Mușchii și Metabolismul', content: 'După 30 de ani, pierzi 3-5% din masă musculară pe deceniu. Antrenamentul cu greutăți previne sarcopenia și menține metabolismul.' },
+    { title: 'Somnul și Longevitatea', content: 'Mai puțin de 6 ore de somn crește riscul de mortalitate cu 12%. Între 7-8 ore este optim pentru longevitate.' },
+    { title: 'HIIT și Mitocondrii', content: 'Antrenamentul HIIT crește numărul și eficiența mitocondriilor - "centralele energetice" ale celulelor - încetinind îmbătrânirea.' },
+    { title: 'Sensul Vieții', content: 'Studiile arată că oamenii cu un scop clar în viață trăiesc în medie 7 ani mai mult. (Blue Zones Research)' },
+    { title: 'Relațiile și Sănătatea', content: 'Studiul Harvard de 80 de ani: calitatea relațiilor este cel mai bun predictor al sănătății și fericirii la bătrânețe.' }
   ],
   ergonomie: [
     { title: 'Regula 20-20-20', content: 'La fiecare 20 min, privește la 20 picioare (6m) distanță timp de 20 secunde pentru a preveni miopia și oboseala oculară.' },
     { title: 'Statul pe Scaun', content: 'Statul jos prelungit dezactivează enzima LPL (care arde grăsimi). Ridică-te 2 minute la fiecare oră.' },
-    { title: 'Tech Neck', content: 'Capul aplecat la 60 de grade (uitatul în telefon) pune o presiune de 27 kg pe coloana cervicală.' }
+    { title: 'Tech Neck', content: 'Capul aplecat la 60 de grade (uitatul în telefon) pune o presiune de 27 kg pe coloana cervicală.' },
+    { title: 'Standing Desk', content: 'Alternarea între stat și în picioare la birou reduce durerile de spate cu 54% și crește energia cu 87%.' },
+    { title: 'Monitorul și Ochii', content: 'Distanța optimă: un braț lungime. Partea de sus a ecranului la nivelul ochilor. Reduce oboseala oculară cu 40%.' },
+    { title: 'Tastatura și Încheieturile', content: 'Încheieturile trebuie să fie drepte sau ușor înclinate în jos. Tastatura înclinată pozitiv crește riscul de sindrom de tunel carpian.' },
+    { title: 'Iluminatul Corect', content: 'Lumina naturală laterală este ideală. Evită reflexiile pe ecran și lumina directă în ochi. 500+ lux pentru productivitate.' },
+    { title: 'Pauze de Mișcare', content: 'Fiecare 30 de minute, 2 minute de mișcare: stretching, genuflexiuni, plimbare. Previne rigiditatea și îmbunătățește circulația.' }
+  ],
+  stres: [
+    { title: 'Respirația 4-7-8', content: 'Inspiră 4 secunde, ține 7 secunde, expiră 8 secunde. Activează nervul vag și reduce anxietatea în 60 de secunde.' },
+    { title: 'Cortizolul Dimineața', content: 'Cortizolul este natural ridicat dimineața. Nu consuma știri negative sau e-mailuri în prima oră - amplifică stresul.' },
+    { title: 'Box Breathing', content: 'Tehnica Navy SEAL: inspiră 4s, ține 4s, expiră 4s, ține 4s. Resetează sistemul nervos în situații de stres acut.' },
+    { title: 'Journaling-ul', content: 'Scrierea despre gânduri și emoții timp de 15 minute reduce stresul și îmbunătățește funcția imunitară. (James Pennebaker)' },
+    { title: 'Nervul Vag', content: 'Stimularea nervului vag (apă rece pe față, gargară, fredonat) activează modul "rest and digest" și reduce anxietatea.' },
+    { title: 'Adaptogenii', content: 'Ashwagandha reduce cortizolul cu 23%. Rhodiola îmbunătățește rezistența la stres. Funcționează după 2-4 săptămâni de uz.' },
+    { title: 'Stresul Bun vs. Rău', content: 'Eustresul (stres pozitiv) îmbunătățește performanța. Distresul (cronic) distruge sănătatea. Atitudinea față de stres contează.' },
+    { title: 'Grounding', content: 'Contactul direct cu pământul (mers desculț pe iarbă) reduce inflamația și îmbunătățește somnul. 30 min/zi optim.' }
+  ],
+  miscare: [
+    { title: 'NEAT', content: 'Non-Exercise Activity Thermogenesis: mișcările mici (gesturi, poziție în picioare, agitație) pot arde 300-500 calorii/zi.' },
+    { title: '10.000 de Pași', content: 'Beneficiile maxime apar la 7.000-8.000 de pași/zi. Peste 10.000 beneficiile sunt marginale pentru sănătate.' },
+    { title: 'Antrenamentul Dimineața', content: 'Exercițiile dimineața cresc metabolismul pentru restul zilei și îmbunătățesc calitatea somnului nocturn.' },
+    { title: 'Compound Exercises', content: 'Exercițiile compuse (genuflexiuni, îndreptări, tracțiuni) stimulează mai mulți mușchi și eliberează mai mult hormon de creștere.' },
+    { title: 'Recuperarea', content: 'Mușchii cresc în timpul odihnei, nu în timpul antrenamentului. 48-72 ore între antrenamente pentru același grup muscular.' },
+    { title: 'Flexibilitatea', content: 'Stretching-ul static după antrenament reduce riscul de accidentare cu 30%. Nu stretch înainte - reduce forța.' },
+    { title: 'Zone 2 Cardio', content: 'Cardio la 60-70% din pulsul maxim (poți vorbi) construiește baza aerobă și arde grăsimi eficient. 150-180 min/săpt.' },
+    { title: 'Pulsul Maxim', content: 'Formula: 220 - vârsta. La 30 ani, pulsul maxim e ~190. Zona 2 = 114-133 bpm. Zona 4 (HIIT) = 162-171 bpm.' }
+  ],
+  mental: [
+    { title: 'Neuroplasticitatea', content: 'Creierul se poate reconfigura la orice vârstă. Învățarea de lucruri noi creează noi conexiuni neuronale și previne declinul cognitiv.' },
+    { title: 'Cititul și Creierul', content: '6 minute de citit reduc stresul cu 68% - mai eficient decât muzica sau o plimbare. (University of Sussex)' },
+    { title: 'Învățarea Activă', content: 'Predarea altora este cel mai eficient mod de a învăța. Retenția: citit 10%, predat 90%. (Piramida învățării)' },
+    { title: 'Somnul și Creativitatea', content: 'Soluțiile creative apar adesea după somn. Creierul procesează și reorganizează informațiile în timpul REM.' },
+    { title: 'Jocul și Adulții', content: 'Jocul nu e doar pentru copii. Activitățile ludice la adulți reduc stresul și stimulează creativitatea.' },
+    { title: 'Limitele Multitasking', content: 'Creierul nu poate face două sarcini cognitive simultan. "Multitasking" este de fapt "task-switching" rapid și ineficient.' },
+    { title: 'Efectul Testing', content: 'Testarea activă (flashcards, quiz-uri) este de 50% mai eficientă decât recitirea pentru memorare.' },
+    { title: 'Memoria și Emoția', content: 'Amintirile încărcate emoțional sunt mai puternice. Leagă informațiile noi de experiențe personale pentru retenție mai bună.' }
+  ],
+  obiceiuri: [
+    { title: 'Habit Stacking', content: 'Leagă un obicei nou de unul existent: "După ce torn cafeaua, voi medita 2 minute." Crește șansele de succes cu 40%.' },
+    { title: 'Regula celor 21 de Zile', content: 'De fapt, obiceiurile noi se formează în 18-254 zile, media fiind 66 zile. Nu te descuraja dacă durează mai mult!' },
+    { title: 'Atomic Habits', content: 'Îmbunătățiri de 1% zilnic = de 37 ori mai bun într-un an. Focusează pe sisteme, nu pe obiective. (James Clear)' },
+    { title: 'Fricțiunea', content: 'Fă obiceiurile bune ușoare (pregătește hainele de sport seara) și pe cele rele grele (șterge aplicațiile de social media).' },
+    { title: 'Răsplata Imediată', content: 'Creierul preferă recompense imediate. Adaugă o răsplată imediată mică la obiceiurile cu beneficii pe termen lung.' },
+    { title: 'Identitatea', content: 'Nu spune "Încerc să nu fumez." Spune "Nu sunt fumător." Schimbarea identității susține schimbarea comportamentului.' },
+    { title: 'Environment Design', content: 'Vrei să citești mai mult? Pune cărți în fiecare cameră. Mediul determină comportamentul mai mult decât voința.' },
+    { title: 'Never Miss Twice', content: 'Poți rata o zi. Dar niciodată două la rând. A doua zi ratată începe un nou (anti)obicei.' }
   ]
 };
+
+// --- Top Alimente Sănătoase pentru secțiunea Nutriție ---
+const topHealthyFoods = [
+  { name: 'Somon', calories: 208, protein: 20, gi: 0, benefits: 'Omega-3, vitamina D, reducere inflamație', category: 'Proteine' },
+  { name: 'Ouă', calories: 155, protein: 13, gi: 0, benefits: 'Colină pentru creier, proteine complete', category: 'Proteine' },
+  { name: 'Spanac', calories: 23, protein: 3, gi: 15, benefits: 'Fier, magneziu, vitaminele K și A', category: 'Legume' },
+  { name: 'Avocado', calories: 160, protein: 2, gi: 15, benefits: 'Grăsimi sănătoase, potasiu, fibre', category: 'Fructe' },
+  { name: 'Afine', calories: 57, protein: 0.7, gi: 53, benefits: 'Antioxidanți, memorie, anti-îmbătrânire', category: 'Fructe' },
+  { name: 'Broccoli', calories: 34, protein: 2.8, gi: 10, benefits: 'Sulforafan anticancer, vitamina C și K', category: 'Legume' },
+  { name: 'Nuci', calories: 654, protein: 15, gi: 15, benefits: 'Omega-3 vegetal, sănătatea creierului', category: 'Nuci' },
+  { name: 'Quinoa', calories: 120, protein: 4.4, gi: 53, benefits: 'Proteină completă, fibre, fără gluten', category: 'Cereale' },
+  { name: 'Ton', calories: 132, protein: 28, gi: 0, benefits: 'Proteine slabe, seleniu, vitamina B12', category: 'Proteine' },
+  { name: 'Lămâie', calories: 29, protein: 1.1, gi: 20, benefits: 'Vitamina C, alcalinizare, digestie', category: 'Fructe' },
+  { name: 'Usturoi', calories: 149, protein: 6.4, gi: 30, benefits: 'Alicină antibacteriană, imunitate', category: 'Condimente' },
+  { name: 'Ghimbir', calories: 80, protein: 1.8, gi: 15, benefits: 'Anti-inflamator, digestie, greață', category: 'Condimente' },
+  { name: 'Curcuma', calories: 354, protein: 8, gi: 5, benefits: 'Curcumină antiinflamatoare puternică', category: 'Condimente' },
+  { name: 'Ovăz', calories: 389, protein: 17, gi: 55, benefits: 'Beta-glucan pentru colesterol, fibre', category: 'Cereale' },
+  { name: 'Iaurt grecesc', calories: 97, protein: 9, gi: 11, benefits: 'Probiotice, proteine, calciu', category: 'Lactate' },
+  { name: 'Linte', calories: 116, protein: 9, gi: 32, benefits: 'Proteine vegetale, fier, fibre', category: 'Leguminoase' },
+  { name: 'Sardine', calories: 208, protein: 25, gi: 0, benefits: 'Omega-3, calciu, vitamina D', category: 'Proteine' },
+  { name: 'Kale', calories: 49, protein: 4.3, gi: 15, benefits: 'Superaliment: vitamine A, C, K', category: 'Legume' },
+  { name: 'Semințe chia', calories: 486, protein: 17, gi: 1, benefits: 'Omega-3, fibre, hidratare', category: 'Semințe' },
+  { name: 'Ceai verde', calories: 1, protein: 0, gi: 0, benefits: 'EGCG antioxidant, metabolism, focus', category: 'Băuturi' },
+];
 
 // --- Componente UI ---
 const Card = ({ children, className = "", onClick, noPadding }) => (
@@ -171,7 +307,18 @@ const getDefaultUserData = () => ({
   breaksTakenDate: new Date().toDateString(),
   mood: null,
   moodDate: new Date().toDateString(),
-  dailyHabits: { sleep: false, nature: false, reading: false, gratitude: false, meditation: false },
+  dailyHabits: { 
+    sleep: false, 
+    nature: false, 
+    reading: false, 
+    alcohol: false,
+    water: false,
+    movement: false,
+    meditation: false,
+    coldexposure: false,
+    journaling: false,
+    noscreen: false
+  },
   dailyHabitsDate: new Date().toDateString(),
   customHabits: [],
   challengeConfig: { name: "", reward: "", isConfigured: false },
@@ -237,6 +384,26 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef(null);
 
+  // Random Fact State
+  const [randomFact, setRandomFact] = useState(null);
+  
+  // Nutrition Category State
+  const [selectedFoodCategory, setSelectedFoodCategory] = useState('Toate');
+
+  // Funcție pentru a genera un fact random din biblioteca
+  const getRandomFact = () => {
+    const allCategories = Object.keys(knowledgeBase);
+    const randomCategory = allCategories[Math.floor(Math.random() * allCategories.length)];
+    const facts = knowledgeBase[randomCategory];
+    const randomFact = facts[Math.floor(Math.random() * facts.length)];
+    return { ...randomFact, category: randomCategory };
+  };
+
+  // Inițializează random fact la montare
+  useEffect(() => {
+    setRandomFact(getRandomFact());
+  }, []);
+
   // --- Firebase Auth Listener ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -257,55 +424,42 @@ export default function App() {
     setDataLoading(true);
     const userDocRef = doc(db, 'users', currentUser.uid);
     
-    const unsubscribe = onSnapshot(
-      userDocRef, 
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const today = new Date().toDateString();
-          const newData = { ...data };
-          
-          // Reset daily data if new day
-          if (data.waterDate !== today) {
-            newData.waterIntake = 0;
-            newData.waterDate = today;
-          }
-          if (data.dailyHabitsDate !== today) {
-            newData.dailyHabits = { sleep: false, nature: false, reading: false, gratitude: false, meditation: false };
-            newData.dailyHabitsDate = today;
-          }
-          if (data.moodDate !== today) {
-            newData.mood = null;
-            newData.moodDate = today;
-          }
-          if (data.breaksTakenDate !== today) {
-            newData.breaksTaken = 0;
-            newData.breaksTakenDate = today;
-          }
-          
-          setUserData(newData);
-          setDarkMode(data.darkMode || false);
-          setShowDisclaimer(!data.disclaimerAccepted);
-        } else {
-          const defaultData = getDefaultUserData();
-          defaultData.profile.name = currentUser.displayName || '';
-          setDoc(userDocRef, defaultData).catch(err => console.error("Error creating user doc:", err));
-          setUserData(defaultData);
-          setShowDisclaimer(true);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const today = new Date().toDateString();
+        const newData = { ...data };
+        
+        // Reset daily data if new day
+        if (data.waterDate !== today) {
+          newData.waterIntake = 0;
+          newData.waterDate = today;
         }
-        setDataLoading(false);
-      },
-      (error) => {
-        // 🔴 ERROR HANDLER - Aceasta lipsea!
-        console.error("Firestore connection error:", error);
-        // Setează date default și permite aplicației să continue
+        if (data.dailyHabitsDate !== today) {
+          newData.dailyHabits = { sleep: false, nature: false, reading: false, gratitude: false, meditation: false };
+          newData.dailyHabitsDate = today;
+        }
+        if (data.moodDate !== today) {
+          newData.mood = null;
+          newData.moodDate = today;
+        }
+        if (data.breaksTakenDate !== today) {
+          newData.breaksTaken = 0;
+          newData.breaksTakenDate = today;
+        }
+        
+        setUserData(newData);
+        setDarkMode(data.darkMode || false);
+        setShowDisclaimer(!data.disclaimerAccepted);
+      } else {
         const defaultData = getDefaultUserData();
         defaultData.profile.name = currentUser.displayName || '';
+        setDoc(userDocRef, defaultData);
         setUserData(defaultData);
         setShowDisclaimer(true);
-        setDataLoading(false);
       }
-    );
+      setDataLoading(false);
+    });
 
     return () => unsubscribe();
   }, [currentUser]);
@@ -746,6 +900,33 @@ export default function App() {
          </div>
       </div>
 
+      {/* Random Fact Card - Știai că? */}
+      {randomFact && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-300/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+          <div className="relative z-10 flex items-start gap-4">
+            <div className="p-3 bg-amber-100 dark:bg-amber-900/50 rounded-xl flex-shrink-0">
+              <Lightbulb className="w-6 h-6 text-amber-600 dark:text-amber-400"/>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Știai că?</span>
+                <span className="text-xs bg-amber-200 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full capitalize">{randomFact.category}</span>
+              </div>
+              <h4 className="font-bold text-amber-900 dark:text-amber-100 mb-1">{randomFact.title}</h4>
+              <p className="text-sm text-amber-800 dark:text-amber-200/80 leading-relaxed">{randomFact.content}</p>
+            </div>
+            <button 
+              onClick={() => setRandomFact(getRandomFact())}
+              className="p-2 bg-amber-200 dark:bg-amber-900/50 rounded-xl hover:bg-amber-300 dark:hover:bg-amber-800/50 transition flex-shrink-0"
+              title="Arată alt fapt"
+            >
+              <RefreshCw className="w-5 h-5 text-amber-700 dark:text-amber-400"/>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
             <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-xl flex items-center gap-2">
@@ -798,7 +979,7 @@ export default function App() {
             </Card>
 
             <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-xl mt-8 flex items-center gap-2">
-                <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400"/> Protocoale Esențiale
+                <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400"/> Protocoale Esențiale (10)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  {[
@@ -806,6 +987,12 @@ export default function App() {
                         { id: 'nature', label: 'Lumină Solară', sub: 'Setare Circadiană', icon: Sun, color: 'amber' },
                         { id: 'reading', label: 'Deep Work', sub: 'Focus 45 min', icon: BookOpen, color: 'emerald' },
                         { id: 'alcohol', label: 'Zero Toxine', sub: 'Fără Alcool', icon: Wine, color: 'rose' },
+                        { id: 'water', label: 'Hidratare 2.5L', sub: 'Funcție Cognitivă', icon: Droplets, color: 'blue' },
+                        { id: 'movement', label: 'Mișcare 30min', sub: 'Activare Metabolică', icon: Activity, color: 'orange' },
+                        { id: 'meditation', label: 'Meditație', sub: 'Mindfulness 10min', icon: Brain, color: 'purple' },
+                        { id: 'coldexposure', label: 'Expunere Frig', sub: 'Duș Rece 2min', icon: Snowflake, color: 'cyan' },
+                        { id: 'journaling', label: 'Jurnal', sub: 'Reflecție Zilnică', icon: PenTool, color: 'pink' },
+                        { id: 'noscreen', label: 'Digital Detox', sub: 'Fără Ecrane 1h', icon: EyeOff, color: 'slate' },
                  ].map(item => (
                     <div key={item.id} onClick={() => toggleHabit(item.id)} 
                         className={`p-4 rounded-2xl border flex items-center gap-4 cursor-pointer transition-all hover:scale-[1.02] ${
@@ -897,12 +1084,20 @@ export default function App() {
       </div>
   );
 
-  const renderNutrition = () => (
-      <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
+  const renderNutrition = () => {
+      const categories = ['Toate', ...new Set(topHealthyFoods.map(f => f.category))];
+      const filteredFoods = selectedFoodCategory === 'Toate' 
+        ? topHealthyFoods 
+        : topHealthyFoods.filter(f => f.category === selectedFoodCategory);
+      
+      return (
+      <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-24 md:pb-0">
           <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Nutriție & Energie</h1>
-              <p className="text-slate-500 dark:text-neutral-400">Combustibil pentru performanță mentală.</p>
+              <p className="text-slate-500 dark:text-neutral-400">Combustibil pentru performanță mentală și longevitate.</p>
           </div>
+          
+          {/* Chef AI Section */}
           <Card className="bg-gradient-to-r from-emerald-900 to-teal-900 text-white border-none relative overflow-hidden">
               <div className="relative z-10 flex flex-col md:flex-row gap-6 items-center">
                   <div className="flex-1">
@@ -922,6 +1117,7 @@ export default function App() {
                   </div>
               </div>
           </Card>
+          
           {generatedMeal && (
               <Card className="animate-fade-in border-l-4 border-l-emerald-500">
                   <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-3">Rețeta Recomandată:</h3>
@@ -930,8 +1126,113 @@ export default function App() {
                   </div>
               </Card>
           )}
+
+          {/* Top 20 Alimente Sănătoase */}
+          <div className="space-y-6">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                  <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                      <Apple className="w-7 h-7 text-emerald-500"/> Top 20 Superalimente
+                  </h2>
+                  <div className="flex gap-2 flex-wrap">
+                      {categories.map(cat => (
+                          <button
+                              key={cat}
+                              onClick={() => setSelectedFoodCategory(cat)}
+                              className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                                  selectedFoodCategory === cat 
+                                  ? 'bg-emerald-600 text-white' 
+                                  : 'bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 hover:bg-slate-200 dark:hover:bg-neutral-700'
+                              }`}
+                          >
+                              {cat}
+                          </button>
+                      ))}
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredFoods.map((food, idx) => (
+                      <Card key={idx} className="p-4 hover:shadow-lg transition-shadow border border-slate-100 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+                          <div className="flex items-start gap-4">
+                              <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex-shrink-0">
+                                  <Leaf className="w-6 h-6 text-emerald-600 dark:text-emerald-400"/>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                      <h3 className="font-bold text-slate-800 dark:text-white">{food.name}</h3>
+                                      <span className="text-xs bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400 px-2 py-0.5 rounded-full">{food.category}</span>
+                                  </div>
+                                  <p className="text-sm text-emerald-700 dark:text-emerald-400 mb-2">{food.benefits}</p>
+                                  
+                                  <div className="flex flex-wrap gap-3 text-xs">
+                                      <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-2 py-1 rounded-lg">
+                                          <Flame className="w-3 h-3"/>
+                                          <span className="font-semibold">{food.calories}</span>
+                                          <span className="opacity-70">kcal/100g</span>
+                                      </div>
+                                      <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-lg">
+                                          <Activity className="w-3 h-3"/>
+                                          <span className="font-semibold">{food.protein}g</span>
+                                          <span className="opacity-70">proteine</span>
+                                      </div>
+                                      <div className="flex items-center gap-1 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 px-2 py-1 rounded-lg">
+                                          <Scale className="w-3 h-3"/>
+                                          <span className="font-semibold">IG {food.gi}</span>
+                                          <span className="opacity-70">{food.gi <= 35 ? 'scăzut' : food.gi <= 55 ? 'mediu' : 'ridicat'}</span>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      </Card>
+                  ))}
+              </div>
+
+              {/* Info Card despre Indicele Glicemic */}
+              <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 border border-purple-200 dark:border-purple-900/50">
+                  <div className="flex items-start gap-4">
+                      <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-xl flex-shrink-0">
+                          <Info className="w-6 h-6 text-purple-600 dark:text-purple-400"/>
+                      </div>
+                      <div>
+                          <h3 className="font-bold text-purple-900 dark:text-purple-100 mb-2">Ce este Indicele Glicemic (IG)?</h3>
+                          <p className="text-sm text-purple-800 dark:text-purple-200/80 leading-relaxed">
+                              Indicele Glicemic măsoară cât de repede un aliment crește glicemia. 
+                              <strong className="text-purple-900 dark:text-purple-100"> IG scăzut (0-35)</strong> = energie stabilă, 
+                              <strong className="text-purple-900 dark:text-purple-100"> IG mediu (36-55)</strong> = moderat, 
+                              <strong className="text-purple-900 dark:text-purple-100"> IG ridicat (56+)</strong> = vârfuri de energie urmate de crash. 
+                              Pentru focus și energie constantă, alege alimente cu IG scăzut!
+                          </p>
+                      </div>
+                  </div>
+              </Card>
+
+              {/* Sfaturi rapide nutriție */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
+                      <div className="text-center">
+                          <div className="text-3xl mb-2">🥗</div>
+                          <h4 className="font-bold text-amber-900 dark:text-amber-100 mb-1">Regula Farfuriei</h4>
+                          <p className="text-xs text-amber-700 dark:text-amber-300">50% legume, 25% proteine, 25% carbohidrați complecși</p>
+                      </div>
+                  </Card>
+                  <Card className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50">
+                      <div className="text-center">
+                          <div className="text-3xl mb-2">⏰</div>
+                          <h4 className="font-bold text-blue-900 dark:text-blue-100 mb-1">Fereastra de Mâncat</h4>
+                          <p className="text-xs text-blue-700 dark:text-blue-300">8-10 ore pentru digestie optimă și autofagie</p>
+                      </div>
+                  </Card>
+                  <Card className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50">
+                      <div className="text-center">
+                          <div className="text-3xl mb-2">🥬</div>
+                          <h4 className="font-bold text-emerald-900 dark:text-emerald-100 mb-1">Ordinea Mâncării</h4>
+                          <p className="text-xs text-emerald-700 dark:text-emerald-300">Fibre → Proteine → Carbohidrați = -73% spike glicemic</p>
+                      </div>
+                  </Card>
+              </div>
+          </div>
       </div>
-  );
+  )};
 
   // --- REDESIGNED CHALLENGES SECTION ---
   const renderChallenges = () => (
