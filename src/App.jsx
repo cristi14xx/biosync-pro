@@ -257,42 +257,55 @@ export default function App() {
     setDataLoading(true);
     const userDocRef = doc(db, 'users', currentUser.uid);
     
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const today = new Date().toDateString();
-        const newData = { ...data };
-        
-        // Reset daily data if new day
-        if (data.waterDate !== today) {
-          newData.waterIntake = 0;
-          newData.waterDate = today;
+    const unsubscribe = onSnapshot(
+      userDocRef, 
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const today = new Date().toDateString();
+          const newData = { ...data };
+          
+          // Reset daily data if new day
+          if (data.waterDate !== today) {
+            newData.waterIntake = 0;
+            newData.waterDate = today;
+          }
+          if (data.dailyHabitsDate !== today) {
+            newData.dailyHabits = { sleep: false, nature: false, reading: false, gratitude: false, meditation: false };
+            newData.dailyHabitsDate = today;
+          }
+          if (data.moodDate !== today) {
+            newData.mood = null;
+            newData.moodDate = today;
+          }
+          if (data.breaksTakenDate !== today) {
+            newData.breaksTaken = 0;
+            newData.breaksTakenDate = today;
+          }
+          
+          setUserData(newData);
+          setDarkMode(data.darkMode || false);
+          setShowDisclaimer(!data.disclaimerAccepted);
+        } else {
+          const defaultData = getDefaultUserData();
+          defaultData.profile.name = currentUser.displayName || '';
+          setDoc(userDocRef, defaultData).catch(err => console.error("Error creating user doc:", err));
+          setUserData(defaultData);
+          setShowDisclaimer(true);
         }
-        if (data.dailyHabitsDate !== today) {
-          newData.dailyHabits = { sleep: false, nature: false, reading: false, gratitude: false, meditation: false };
-          newData.dailyHabitsDate = today;
-        }
-        if (data.moodDate !== today) {
-          newData.mood = null;
-          newData.moodDate = today;
-        }
-        if (data.breaksTakenDate !== today) {
-          newData.breaksTaken = 0;
-          newData.breaksTakenDate = today;
-        }
-        
-        setUserData(newData);
-        setDarkMode(data.darkMode || false);
-        setShowDisclaimer(!data.disclaimerAccepted);
-      } else {
+        setDataLoading(false);
+      },
+      (error) => {
+        // 🔴 ERROR HANDLER - Aceasta lipsea!
+        console.error("Firestore connection error:", error);
+        // Setează date default și permite aplicației să continue
         const defaultData = getDefaultUserData();
         defaultData.profile.name = currentUser.displayName || '';
-        setDoc(userDocRef, defaultData);
         setUserData(defaultData);
         setShowDisclaimer(true);
+        setDataLoading(false);
       }
-      setDataLoading(false);
-    });
+    );
 
     return () => unsubscribe();
   }, [currentUser]);
