@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Activity, 
   Brain, 
@@ -53,7 +53,44 @@ import {
   RefreshCw,
   Lightbulb,
   Apple,
-  Scale
+  Scale,
+  TrendingUp,
+  Award,
+  Star,
+  Crown,
+  Bed,
+  Coffee,
+  Sunrise,
+  Sunset,
+  BarChart3,
+  PieChart,
+  CalendarDays,
+  ChevronLeft,
+  Frown,
+  Meh,
+  SmilePlus,
+  PartyPopper,
+  Dumbbell,
+  Salad,
+  GraduationCap,
+  Briefcase,
+  Baby,
+  Users,
+  type as TypeIcon,
+  Contrast,
+  Bell,
+  BellOff,
+  Check,
+  FileText,
+  Quote,
+  Footprints,
+  Gem,
+  Shield,
+  Rocket,
+  Swords,
+  FlameKindling,
+  Waves,
+  TreePine
 } from 'lucide-react';
 
 // Firebase imports
@@ -263,6 +300,89 @@ const topHealthyFoods = [
   { name: 'Ceai verde', calories: 1, protein: 0, gi: 0, benefits: 'EGCG antioxidant, metabolism, focus', category: 'Băuturi' },
 ];
 
+// --- Sistem de Achievements/Badge-uri ---
+const achievementsList = [
+  // Începător
+  { id: 'first_day', name: 'Prima Zi', description: 'Ai completat prima zi', icon: Sunrise, xp: 50, category: 'general' },
+  { id: 'first_week', name: 'Prima Săptămână', description: '7 zile consecutive', icon: Calendar, xp: 200, category: 'general' },
+  { id: 'first_month', name: 'Prima Lună', description: '30 zile consecutive', icon: CalendarDays, xp: 500, category: 'general' },
+  
+  // Hidratare
+  { id: 'water_100', name: 'Hidratat', description: '100 pahare de apă', icon: Droplets, xp: 100, category: 'water' },
+  { id: 'water_500', name: 'Acvatic', description: '500 pahare de apă', icon: Waves, xp: 300, category: 'water' },
+  { id: 'water_streak_7', name: 'Flux Constant', description: '7 zile cu goal de apă atins', icon: Droplets, xp: 150, category: 'water' },
+  
+  // Somn
+  { id: 'sleep_tracker_7', name: 'Visător', description: '7 nopți tracked', icon: Moon, xp: 100, category: 'sleep' },
+  { id: 'sleep_quality_high', name: 'Somn de Aur', description: '5 nopți cu calitate excelentă', icon: Star, xp: 200, category: 'sleep' },
+  { id: 'sleep_consistent', name: 'Ritm Circadian', description: '7 zile cu ore constante de somn', icon: Clock, xp: 250, category: 'sleep' },
+  
+  // Focus
+  { id: 'focus_1h', name: 'Concentrat', description: '1 oră totală de focus', icon: Target, xp: 50, category: 'focus' },
+  { id: 'focus_10h', name: 'Deep Worker', description: '10 ore totale de focus', icon: Brain, xp: 200, category: 'focus' },
+  { id: 'focus_100h', name: 'Zen Master', description: '100 ore totale de focus', icon: Sparkles, xp: 500, category: 'focus' },
+  
+  // Provocări
+  { id: 'challenge_complete', name: 'Campion', description: 'Ai completat o provocare de 30 zile', icon: Trophy, xp: 1000, category: 'challenge' },
+  { id: 'challenge_3', name: 'Triplu Campion', description: '3 provocări completate', icon: Medal, xp: 2000, category: 'challenge' },
+  
+  // Mindfulness
+  { id: 'meditation_7', name: 'Calm Interior', description: '7 sesiuni de respirație', icon: Wind, xp: 100, category: 'mindfulness' },
+  { id: 'gratitude_30', name: 'Recunoscător', description: '30 intrări de recunoștință', icon: Heart, xp: 200, category: 'mindfulness' },
+  
+  // Obiceiuri
+  { id: 'habits_all_10', name: 'Zi Perfectă', description: 'Toate cele 10 protocoale într-o zi', icon: CheckCircle, xp: 100, category: 'habits' },
+  { id: 'habits_perfect_week', name: 'Săptămână Perfectă', description: '7 zile cu toate protocoalele', icon: Crown, xp: 500, category: 'habits' },
+  
+  // Nutriție
+  { id: 'meal_gen_10', name: 'Chef Apprentice', description: '10 rețete generate', icon: Utensils, xp: 100, category: 'nutrition' },
+  
+  // Nivel
+  { id: 'level_5', name: 'În Progres', description: 'Ai atins nivelul 5', icon: TrendingUp, xp: 0, category: 'level' },
+  { id: 'level_10', name: 'Dedicat', description: 'Ai atins nivelul 10', icon: Gem, xp: 0, category: 'level' },
+  { id: 'level_25', name: 'Expert', description: 'Ai atins nivelul 25', icon: Shield, xp: 0, category: 'level' },
+  { id: 'level_50', name: 'Maestru', description: 'Ai atins nivelul 50', icon: Crown, xp: 0, category: 'level' },
+];
+
+// --- Sistem de Nivele ---
+const levelSystem = {
+  getLevel: (xp) => Math.floor(Math.sqrt(xp / 100)) + 1,
+  getXPForLevel: (level) => Math.pow(level - 1, 2) * 100,
+  getXPForNextLevel: (level) => Math.pow(level, 2) * 100,
+  getLevelName: (level) => {
+    if (level < 5) return { name: 'Începător', icon: Footprints, color: 'slate' };
+    if (level < 10) return { name: 'Explorator', icon: Rocket, color: 'blue' };
+    if (level < 20) return { name: 'Practicant', icon: Target, color: 'emerald' };
+    if (level < 35) return { name: 'Avansat', icon: Gem, color: 'purple' };
+    if (level < 50) return { name: 'Expert', icon: Shield, color: 'amber' };
+    return { name: 'Maestru Biohacker', icon: Crown, color: 'yellow' };
+  }
+};
+
+// --- Profile de Utilizator ---
+const userProfiles = [
+  { id: 'student', name: 'Student', icon: GraduationCap, description: 'Focus pe concentrare, memorie și energie pentru examene', color: 'blue' },
+  { id: 'corporate', name: 'Corporate', icon: Briefcase, description: 'Gestionarea stresului, ergonomie și prevenirea burnout', color: 'slate' },
+  { id: 'athlete', name: 'Sportiv', icon: Dumbbell, description: 'Recuperare, nutriție optimă și performanță fizică', color: 'orange' },
+  { id: 'parent', name: 'Părinte', icon: Baby, description: 'Energie, răbdare și somn în ciuda programului încărcat', color: 'pink' },
+  { id: 'senior', name: 'Senior', icon: Heart, description: 'Longevitate, mobilitate și sănătate cognitivă', color: 'emerald' },
+  { id: 'general', name: 'General', icon: Users, description: 'Echilibru general pentru sănătate și bunăstare', color: 'indigo' },
+];
+
+// --- Mood Factors ---
+const moodFactors = [
+  { id: 'sleep_bad', label: 'Somn prost', icon: Moon, negative: true },
+  { id: 'stress', label: 'Stres', icon: Flame, negative: true },
+  { id: 'work', label: 'Muncă grea', icon: Briefcase, negative: true },
+  { id: 'health', label: 'Probleme sănătate', icon: Heart, negative: true },
+  { id: 'exercise', label: 'Am făcut sport', icon: Dumbbell, negative: false },
+  { id: 'nature', label: 'Timp în natură', icon: TreePine, negative: false },
+  { id: 'social', label: 'Socializare', icon: Users, negative: false },
+  { id: 'achievement', label: 'Am realizat ceva', icon: Trophy, negative: false },
+  { id: 'good_food', label: 'Am mâncat sănătos', icon: Salad, negative: false },
+  { id: 'meditation', label: 'Am meditat', icon: Brain, negative: false },
+];
+
 // --- Componente UI ---
 const Card = ({ children, className = "", onClick, noPadding }) => (
   <div onClick={onClick} className={`bg-white dark:bg-neutral-950 rounded-2xl shadow-sm border border-slate-100 dark:border-neutral-800 ${noPadding ? '' : 'p-6'} ${className}`}>
@@ -297,9 +417,53 @@ const CircularProgress = ({ score, size = 24 }) => {
   );
 };
 
+// Mini bar chart component for stats
+const MiniBarChart = ({ data, height = 60, color = 'indigo' }) => {
+  const max = Math.max(...data.map(d => d.value), 1);
+  return (
+    <div className="flex items-end gap-1" style={{ height }}>
+      {data.map((d, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+          <div 
+            className={`w-full bg-${color}-500 dark:bg-${color}-600 rounded-t transition-all duration-500`}
+            style={{ height: `${(d.value / max) * 100}%`, minHeight: d.value > 0 ? 4 : 0 }}
+          />
+          <span className="text-[10px] text-slate-400 dark:text-neutral-500">{d.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // --- Default User Data for Firebase ---
 const getDefaultUserData = () => ({
+  // Onboarding
+  onboardingComplete: false,
+  userType: null, // student, corporate, athlete, parent, senior, general
+  primaryGoal: null, // energy, sleep, productivity, weight, stress
+  dailyTimeAvailable: null, // 5, 15, 30
+  experienceLevel: null, // beginner, intermediate, advanced
+  
+  // Profile
   profile: { name: "", age: 0, bio: "Biohacker în devenire" },
+  
+  // XP & Level System
+  xp: 0,
+  totalXP: 0,
+  unlockedAchievements: [],
+  
+  // Statistics tracking
+  stats: {
+    totalWaterGlasses: 0,
+    totalFocusMinutes: 0,
+    totalMeditationSessions: 0,
+    totalGratitudeEntries: 0,
+    totalMealsGenerated: 0,
+    perfectDays: 0,
+    longestStreak: 0,
+  },
+  
+  // Daily data (reset zilnic)
   waterIntake: 0,
   waterGoal: 2500,
   waterDate: new Date().toDateString(),
@@ -323,7 +487,34 @@ const getDefaultUserData = () => ({
   customHabits: [],
   challengeConfig: { name: "", reward: "", isConfigured: false },
   challengeProgress: Array(30).fill(false),
+  challengesCompleted: 0,
   journalHistory: [],
+  
+  // Sleep Tracking
+  sleepLog: [], // [{date, bedtime, wakeTime, quality (1-5), duration, notes}]
+  lastSleepEntry: null,
+  
+  // Mood Journal Extended
+  moodLog: [], // [{date, mood (0-3), note, factors: []}]
+  
+  // Streak System
+  currentStreak: 0,
+  lastActiveDate: null,
+  
+  // Weekly scores for history
+  weeklyScores: [], // [{weekStart, avgScore, habitsCompleted, waterAvg}]
+  dailyScores: [], // [{date, score}] - last 30 days
+  
+  // Accessibility Settings
+  settings: {
+    fontSize: 'normal', // small, normal, large
+    highContrast: false,
+    notificationsEnabled: true,
+    reminderWater: true,
+    reminderBreak: true,
+    reminderSleep: true,
+  },
+  
   darkMode: false,
   disclaimerAccepted: false
 });
@@ -389,6 +580,39 @@ export default function App() {
   
   // Nutrition Category State
   const [selectedFoodCategory, setSelectedFoodCategory] = useState('Toate');
+
+  // --- New Feature States ---
+  // Onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  
+  // Sleep Tracker Modal
+  const [showSleepModal, setShowSleepModal] = useState(false);
+  const [sleepEntry, setSleepEntry] = useState({ bedtime: '23:00', wakeTime: '07:00', quality: 3, notes: '' });
+  
+  // Mood Journal Modal
+  const [showMoodModal, setShowMoodModal] = useState(false);
+  const [moodEntry, setMoodEntry] = useState({ mood: null, note: '', factors: [] });
+  
+  // Achievement notification
+  const [newAchievement, setNewAchievement] = useState(null);
+  
+  // Weekly Review Modal
+  const [showWeeklyReview, setShowWeeklyReview] = useState(false);
+  
+  // Stats period
+  const [statsPeriod, setStatsPeriod] = useState('week'); // week, month, all
+
+  // Computed values
+  const currentLevel = useMemo(() => levelSystem.getLevel(userData.xp || 0), [userData.xp]);
+  const levelInfo = useMemo(() => levelSystem.getLevelName(currentLevel), [currentLevel]);
+  const xpForCurrentLevel = useMemo(() => levelSystem.getXPForLevel(currentLevel), [currentLevel]);
+  const xpForNextLevel = useMemo(() => levelSystem.getXPForNextLevel(currentLevel), [currentLevel]);
+  const xpProgress = useMemo(() => {
+    const currentXP = (userData.xp || 0) - xpForCurrentLevel;
+    const neededXP = xpForNextLevel - xpForCurrentLevel;
+    return Math.min((currentXP / neededXP) * 100, 100);
+  }, [userData.xp, xpForCurrentLevel, xpForNextLevel]);
 
   // Funcție pentru a genera un fact random din biblioteca
   const getRandomFact = () => {
@@ -474,6 +698,213 @@ export default function App() {
       console.error("Error saving data:", error);
     }
   };
+
+  // --- XP & Achievement System ---
+  const addXP = (amount, source = '') => {
+    const newXP = (userData.xp || 0) + amount;
+    const newTotalXP = (userData.totalXP || 0) + amount;
+    const oldLevel = levelSystem.getLevel(userData.xp || 0);
+    const newLevel = levelSystem.getLevel(newXP);
+    
+    const updates = { xp: newXP, totalXP: newTotalXP };
+    
+    // Level up notification
+    if (newLevel > oldLevel) {
+      triggerNotification(`Nivel ${newLevel}!`, `Felicitări! Ai avansat la ${levelSystem.getLevelName(newLevel).name}`, 'success');
+      checkAchievement(`level_${newLevel}`);
+    }
+    
+    setUserData(prev => ({ ...prev, ...updates }));
+    saveUserData(updates);
+    
+    if (source) {
+      triggerNotification(`+${amount} XP`, source, 'success');
+    }
+  };
+
+  const checkAchievement = (achievementId) => {
+    const achievement = achievementsList.find(a => a.id === achievementId);
+    if (!achievement) return;
+    
+    const unlockedAchievements = userData.unlockedAchievements || [];
+    if (unlockedAchievements.includes(achievementId)) return;
+    
+    // Unlock achievement
+    const newUnlocked = [...unlockedAchievements, achievementId];
+    setUserData(prev => ({ ...prev, unlockedAchievements: newUnlocked }));
+    saveUserData({ unlockedAchievements: newUnlocked });
+    
+    // Show achievement notification
+    setNewAchievement(achievement);
+    setTimeout(() => setNewAchievement(null), 4000);
+    
+    // Add XP from achievement
+    if (achievement.xp > 0) {
+      addXP(achievement.xp);
+    }
+  };
+
+  // Check streak and daily achievements
+  const checkDailyProgress = () => {
+    const today = new Date().toDateString();
+    const lastActive = userData.lastActiveDate;
+    
+    if (lastActive !== today) {
+      // New day - update streak
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      let newStreak = 1;
+      if (lastActive === yesterday.toDateString()) {
+        newStreak = (userData.currentStreak || 0) + 1;
+      }
+      
+      const updates = {
+        currentStreak: newStreak,
+        lastActiveDate: today,
+      };
+      
+      // Update longest streak
+      if (newStreak > (userData.stats?.longestStreak || 0)) {
+        updates.stats = { ...userData.stats, longestStreak: newStreak };
+      }
+      
+      setUserData(prev => ({ ...prev, ...updates }));
+      saveUserData(updates);
+      
+      // Check streak achievements
+      if (newStreak === 7) checkAchievement('first_week');
+      if (newStreak === 30) checkAchievement('first_month');
+      
+      // First day achievement
+      if (!userData.unlockedAchievements?.includes('first_day')) {
+        checkAchievement('first_day');
+      }
+    }
+  };
+
+  // --- Sleep Tracking ---
+  const saveSleepEntry = () => {
+    const today = new Date().toDateString();
+    const entry = {
+      date: today,
+      bedtime: sleepEntry.bedtime,
+      wakeTime: sleepEntry.wakeTime,
+      quality: sleepEntry.quality,
+      notes: sleepEntry.notes,
+      duration: calculateSleepDuration(sleepEntry.bedtime, sleepEntry.wakeTime)
+    };
+    
+    const sleepLog = [...(userData.sleepLog || []), entry].slice(-90); // Keep last 90 days
+    
+    setUserData(prev => ({ ...prev, sleepLog, lastSleepEntry: today }));
+    saveUserData({ sleepLog, lastSleepEntry: today });
+    setShowSleepModal(false);
+    
+    // Check achievements
+    const totalSleepEntries = sleepLog.length;
+    if (totalSleepEntries >= 7) checkAchievement('sleep_tracker_7');
+    
+    const highQualityNights = sleepLog.filter(s => s.quality >= 4).length;
+    if (highQualityNights >= 5) checkAchievement('sleep_quality_high');
+    
+    addXP(10, 'Somn înregistrat');
+    triggerNotification('Somn salvat', `${entry.duration}h de somn înregistrate`, 'success');
+  };
+
+  const calculateSleepDuration = (bedtime, wakeTime) => {
+    const [bedH, bedM] = bedtime.split(':').map(Number);
+    const [wakeH, wakeM] = wakeTime.split(':').map(Number);
+    
+    let bedMinutes = bedH * 60 + bedM;
+    let wakeMinutes = wakeH * 60 + wakeM;
+    
+    if (wakeMinutes < bedMinutes) {
+      wakeMinutes += 24 * 60; // Next day
+    }
+    
+    return ((wakeMinutes - bedMinutes) / 60).toFixed(1);
+  };
+
+  // --- Mood Journal ---
+  const saveMoodEntry = () => {
+    const today = new Date().toDateString();
+    const entry = {
+      date: today,
+      timestamp: new Date().toISOString(),
+      mood: moodEntry.mood,
+      note: moodEntry.note,
+      factors: moodEntry.factors
+    };
+    
+    const moodLog = [...(userData.moodLog || []), entry].slice(-90);
+    
+    // Also update the daily mood
+    setUserData(prev => ({ 
+      ...prev, 
+      moodLog, 
+      mood: moodEntry.mood, 
+      moodDate: today 
+    }));
+    saveUserData({ moodLog, mood: moodEntry.mood, moodDate: today });
+    setShowMoodModal(false);
+    setMoodEntry({ mood: null, note: '', factors: [] });
+    
+    addXP(15, 'Jurnal completat');
+    triggerNotification('Stare salvată', 'Reflecția ta a fost înregistrată', 'success');
+  };
+
+  // --- Complete Onboarding ---
+  const completeOnboarding = (data) => {
+    const updates = {
+      onboardingComplete: true,
+      userType: data.userType,
+      primaryGoal: data.primaryGoal,
+      dailyTimeAvailable: data.dailyTimeAvailable,
+      experienceLevel: data.experienceLevel,
+    };
+    
+    setUserData(prev => ({ ...prev, ...updates }));
+    saveUserData(updates);
+    setShowOnboarding(false);
+    
+    addXP(100, 'Onboarding completat!');
+    triggerNotification('Bine ai venit!', 'Profilul tău a fost configurat', 'success');
+  };
+
+  // --- Update Daily Score History ---
+  const updateDailyScore = (newScore) => {
+    const today = new Date().toDateString();
+    const dailyScores = [...(userData.dailyScores || [])];
+    
+    // Update or add today's score
+    const todayIndex = dailyScores.findIndex(s => s.date === today);
+    if (todayIndex >= 0) {
+      dailyScores[todayIndex].score = newScore;
+    } else {
+      dailyScores.push({ date: today, score: newScore });
+    }
+    
+    // Keep last 30 days
+    const last30Days = dailyScores.slice(-30);
+    
+    setUserData(prev => ({ ...prev, dailyScores: last30Days }));
+    saveUserData({ dailyScores: last30Days });
+  };
+
+  // Check if should show onboarding
+  useEffect(() => {
+    if (currentUser && !dataLoading && !userData.onboardingComplete) {
+      setShowOnboarding(true);
+    }
+  }, [currentUser, dataLoading, userData.onboardingComplete]);
+
+  // Check daily progress on load
+  useEffect(() => {
+    if (currentUser && !dataLoading) {
+      checkDailyProgress();
+    }
+  }, [currentUser, dataLoading]);
 
   // --- Effects ---
   useEffect(() => {
@@ -735,6 +1166,518 @@ export default function App() {
     setIsGeneratingRoutine(false);
   };
 
+  // --- Onboarding Component ---
+  const renderOnboarding = () => {
+    const steps = [
+      {
+        title: 'Care e obiectivul tău principal?',
+        options: [
+          { id: 'energy', label: 'Mai multă energie', icon: Zap, color: 'amber' },
+          { id: 'sleep', label: 'Somn mai bun', icon: Moon, color: 'indigo' },
+          { id: 'productivity', label: 'Productivitate', icon: Target, color: 'emerald' },
+          { id: 'weight', label: 'Greutate sănătoasă', icon: Scale, color: 'blue' },
+          { id: 'stress', label: 'Reducere stres', icon: Heart, color: 'rose' },
+        ]
+      },
+      {
+        title: 'Ce te descrie cel mai bine?',
+        options: userProfiles
+      },
+      {
+        title: 'Cât timp ai disponibil zilnic?',
+        options: [
+          { id: 5, label: '5 minute', icon: Clock, color: 'slate', description: 'Micro-obiceiuri rapide' },
+          { id: 15, label: '15 minute', icon: Clock, color: 'blue', description: 'Rutine eficiente' },
+          { id: 30, label: '30+ minute', icon: Clock, color: 'emerald', description: 'Transformare completă' },
+        ]
+      },
+      {
+        title: 'Ce experiență ai cu biohacking?',
+        options: [
+          { id: 'beginner', label: 'Începător', icon: Footprints, color: 'slate', description: 'Abia încep' },
+          { id: 'intermediate', label: 'Intermediar', icon: Target, color: 'blue', description: 'Cunosc bazele' },
+          { id: 'advanced', label: 'Avansat', icon: Crown, color: 'amber', description: 'Practician experimentat' },
+        ]
+      }
+    ];
+
+    const [selections, setSelections] = useState({
+      primaryGoal: null,
+      userType: null,
+      dailyTimeAvailable: null,
+      experienceLevel: null,
+    });
+
+    const stepKeys = ['primaryGoal', 'userType', 'dailyTimeAvailable', 'experienceLevel'];
+
+    return (
+      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center p-4">
+        <div className="max-w-lg w-full">
+          {/* Progress bar */}
+          <div className="flex gap-2 mb-8">
+            {steps.map((_, idx) => (
+              <div key={idx} className={`flex-1 h-2 rounded-full transition-all ${idx <= onboardingStep ? 'bg-indigo-500' : 'bg-neutral-800'}`} />
+            ))}
+          </div>
+
+          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 animate-fade-in">
+            <h2 className="text-2xl font-bold text-white mb-6 text-center">
+              {steps[onboardingStep].title}
+            </h2>
+
+            <div className="space-y-3">
+              {steps[onboardingStep].options.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => {
+                    setSelections(prev => ({ ...prev, [stepKeys[onboardingStep]]: opt.id }));
+                    
+                    if (onboardingStep < steps.length - 1) {
+                      setTimeout(() => setOnboardingStep(s => s + 1), 300);
+                    } else {
+                      completeOnboarding({ ...selections, [stepKeys[onboardingStep]]: opt.id });
+                    }
+                  }}
+                  className={`w-full p-4 rounded-xl border transition-all flex items-center gap-4 ${
+                    selections[stepKeys[onboardingStep]] === opt.id
+                      ? `bg-${opt.color}-500/20 border-${opt.color}-500 text-white`
+                      : 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:border-neutral-600'
+                  }`}
+                >
+                  <div className={`p-3 rounded-xl bg-${opt.color}-500/20`}>
+                    <opt.icon className={`w-6 h-6 text-${opt.color}-400`} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <div className="font-bold">{opt.label || opt.name}</div>
+                    {opt.description && <div className="text-sm text-neutral-400">{opt.description}</div>}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {onboardingStep > 0 && (
+              <button 
+                onClick={() => setOnboardingStep(s => s - 1)}
+                className="mt-6 text-neutral-400 hover:text-white transition flex items-center gap-2"
+              >
+                <ChevronLeft className="w-4 h-4" /> Înapoi
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // --- Sleep Modal ---
+  const renderSleepModal = () => (
+    <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+      <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Moon className="w-6 h-6 text-indigo-400" /> Înregistrează Somnul
+          </h2>
+          <button onClick={() => setShowSleepModal(false)} className="p-2 bg-neutral-800 rounded-full text-neutral-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-neutral-400 mb-2 block">M-am culcat la:</label>
+              <input 
+                type="time" 
+                value={sleepEntry.bedtime}
+                onChange={(e) => setSleepEntry(prev => ({ ...prev, bedtime: e.target.value }))}
+                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-neutral-400 mb-2 block">M-am trezit la:</label>
+              <input 
+                type="time" 
+                value={sleepEntry.wakeTime}
+                onChange={(e) => setSleepEntry(prev => ({ ...prev, wakeTime: e.target.value }))}
+                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-neutral-400 mb-3 block">Calitatea somnului:</label>
+            <div className="flex justify-between gap-2">
+              {[1, 2, 3, 4, 5].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setSleepEntry(prev => ({ ...prev, quality: q }))}
+                  className={`flex-1 py-3 rounded-xl font-bold transition ${
+                    sleepEntry.quality === q 
+                      ? 'bg-indigo-600 text-white' 
+                      : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                  }`}
+                >
+                  {q === 1 ? '😫' : q === 2 ? '😕' : q === 3 ? '😐' : q === 4 ? '😊' : '🤩'}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-between text-xs text-neutral-500 mt-1 px-2">
+              <span>Groaznic</span>
+              <span>Excelent</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-neutral-400 mb-2 block">Note (opțional):</label>
+            <textarea
+              value={sleepEntry.notes}
+              onChange={(e) => setSleepEntry(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="Am visat ceva interesant..."
+              className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white resize-none h-20"
+            />
+          </div>
+
+          <div className="bg-neutral-800 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-neutral-400">Durată estimată:</span>
+              <span className="text-2xl font-bold text-indigo-400">
+                {calculateSleepDuration(sleepEntry.bedtime, sleepEntry.wakeTime)}h
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={saveSleepEntry}
+            className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition"
+          >
+            Salvează +10 XP
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // --- Mood Modal ---
+  const renderMoodModal = () => (
+    <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+      <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Smile className="w-6 h-6 text-amber-400" /> Cum te simți?
+          </h2>
+          <button onClick={() => setShowMoodModal(false)} className="p-2 bg-neutral-800 rounded-full text-neutral-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          <div className="flex justify-between gap-3">
+            {[
+              { id: 0, emoji: '😞', label: 'Rău', color: 'rose' },
+              { id: 1, emoji: '😐', label: 'Meh', color: 'slate' },
+              { id: 2, emoji: '🙂', label: 'Bine', color: 'blue' },
+              { id: 3, emoji: '🤩', label: 'Super!', color: 'emerald' },
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setMoodEntry(prev => ({ ...prev, mood: m.id }))}
+                className={`flex-1 py-4 rounded-xl transition flex flex-col items-center gap-2 ${
+                  moodEntry.mood === m.id 
+                    ? `bg-${m.color}-500/20 border-2 border-${m.color}-500` 
+                    : 'bg-neutral-800 border-2 border-transparent'
+                }`}
+              >
+                <span className="text-3xl">{m.emoji}</span>
+                <span className={`text-xs font-medium ${moodEntry.mood === m.id ? `text-${m.color}-400` : 'text-neutral-400'}`}>
+                  {m.label}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <label className="text-sm text-neutral-400 mb-3 block">Ce a influențat starea ta?</label>
+            <div className="flex flex-wrap gap-2">
+              {moodFactors.map((factor) => (
+                <button
+                  key={factor.id}
+                  onClick={() => {
+                    setMoodEntry(prev => ({
+                      ...prev,
+                      factors: prev.factors.includes(factor.id)
+                        ? prev.factors.filter(f => f !== factor.id)
+                        : [...prev.factors, factor.id]
+                    }));
+                  }}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
+                    moodEntry.factors.includes(factor.id)
+                      ? factor.negative 
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50'
+                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                      : 'bg-neutral-800 text-neutral-400 border border-transparent hover:bg-neutral-700'
+                  }`}
+                >
+                  <factor.icon className="w-4 h-4" />
+                  {factor.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-neutral-400 mb-2 block">Notă personală (opțional):</label>
+            <textarea
+              value={moodEntry.note}
+              onChange={(e) => setMoodEntry(prev => ({ ...prev, note: e.target.value }))}
+              placeholder="Cum a fost ziua ta? Ce ai învățat?"
+              className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white resize-none h-24"
+            />
+          </div>
+
+          <button
+            onClick={saveMoodEntry}
+            disabled={moodEntry.mood === null}
+            className={`w-full font-bold py-4 rounded-xl transition ${
+              moodEntry.mood !== null 
+                ? 'bg-amber-600 text-white hover:bg-amber-700' 
+                : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+            }`}
+          >
+            Salvează +15 XP
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // --- Achievement Notification ---
+  const renderAchievementNotification = () => {
+    if (!newAchievement) return null;
+    
+    return (
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-bounce-in">
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-1 shadow-2xl shadow-amber-500/50">
+          <div className="bg-neutral-900 rounded-xl p-4 flex items-center gap-4">
+            <div className="w-16 h-16 bg-amber-500/20 rounded-xl flex items-center justify-center">
+              <newAchievement.icon className="w-8 h-8 text-amber-400" />
+            </div>
+            <div>
+              <div className="text-amber-400 text-xs font-bold uppercase tracking-wider">🏆 Achievement Deblocat!</div>
+              <div className="text-white font-bold text-lg">{newAchievement.name}</div>
+              <div className="text-neutral-400 text-sm">{newAchievement.description}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // --- Stats View ---
+  const renderStats = () => {
+    const last7Days = (userData.dailyScores || []).slice(-7);
+    const last30Days = (userData.dailyScores || []).slice(-30);
+    const avgScore7 = last7Days.length > 0 ? Math.round(last7Days.reduce((a, b) => a + b.score, 0) / last7Days.length) : 0;
+    const avgScore30 = last30Days.length > 0 ? Math.round(last30Days.reduce((a, b) => a + b.score, 0) / last30Days.length) : 0;
+    
+    const sleepLast7 = (userData.sleepLog || []).slice(-7);
+    const avgSleep = sleepLast7.length > 0 ? (sleepLast7.reduce((a, b) => a + parseFloat(b.duration), 0) / sleepLast7.length).toFixed(1) : 0;
+    
+    const chartData = last7Days.map((d, i) => ({
+      label: ['L', 'M', 'M', 'J', 'V', 'S', 'D'][new Date(d.date).getDay()],
+      value: d.score
+    }));
+
+    return (
+      <div className="space-y-6 animate-fade-in pb-24 md:pb-0">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Statistici & Progres</h1>
+          <p className="text-slate-500 dark:text-neutral-400">Vizualizează-ți călătoria</p>
+        </div>
+
+        {/* Level Card */}
+        <Card className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-none relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-indigo-200 text-sm font-medium mb-1">Nivel {currentLevel}</div>
+                <div className="text-3xl font-bold flex items-center gap-2">
+                  <levelInfo.icon className="w-8 h-8" />
+                  {levelInfo.name}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-4xl font-bold">{userData.xp || 0}</div>
+                <div className="text-indigo-200 text-sm">XP Total</div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-indigo-200">Progres spre nivel {currentLevel + 1}</span>
+                <span className="font-bold">{Math.round(xpProgress)}%</span>
+              </div>
+              <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-white rounded-full transition-all duration-1000"
+                  style={{ width: `${xpProgress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-indigo-200">
+                <span>{xpForCurrentLevel} XP</span>
+                <span>{xpForNextLevel} XP</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Quick Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-4 text-center">
+            <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{userData.currentStreak || 0}</div>
+            <div className="text-sm text-slate-500 dark:text-neutral-400">🔥 Streak Curent</div>
+          </Card>
+          <Card className="p-4 text-center">
+            <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{userData.stats?.longestStreak || 0}</div>
+            <div className="text-sm text-slate-500 dark:text-neutral-400">📈 Cel Mai Lung</div>
+          </Card>
+          <Card className="p-4 text-center">
+            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{avgScore7}</div>
+            <div className="text-sm text-slate-500 dark:text-neutral-400">⭐ Scor Mediu 7z</div>
+          </Card>
+          <Card className="p-4 text-center">
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{avgSleep}h</div>
+            <div className="text-sm text-slate-500 dark:text-neutral-400">😴 Somn Mediu</div>
+          </Card>
+        </div>
+
+        {/* Score Chart */}
+        <Card>
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-indigo-500" /> Scorul din ultima săptămână
+          </h3>
+          {chartData.length > 0 ? (
+            <MiniBarChart data={chartData} height={120} color="indigo" />
+          ) : (
+            <div className="text-center py-8 text-slate-400 dark:text-neutral-500">
+              Nu ai încă date. Continuă să îți urmărești progresul!
+            </div>
+          )}
+        </Card>
+
+        {/* Achievements */}
+        <Card>
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-amber-500" /> Badge-uri ({(userData.unlockedAchievements || []).length}/{achievementsList.length})
+          </h3>
+          <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+            {achievementsList.slice(0, 12).map((ach) => {
+              const isUnlocked = (userData.unlockedAchievements || []).includes(ach.id);
+              return (
+                <div 
+                  key={ach.id}
+                  className={`aspect-square rounded-xl flex flex-col items-center justify-center p-2 transition ${
+                    isUnlocked 
+                      ? 'bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-400' 
+                      : 'bg-slate-100 dark:bg-neutral-800 opacity-40'
+                  }`}
+                  title={`${ach.name}: ${ach.description}`}
+                >
+                  <ach.icon className={`w-6 h-6 ${isUnlocked ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-neutral-500'}`} />
+                  <span className={`text-[10px] font-medium mt-1 text-center ${isUnlocked ? 'text-amber-700 dark:text-amber-300' : 'text-slate-400 dark:text-neutral-500'}`}>
+                    {ach.name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <button 
+            onClick={() => setActiveTab('achievements')}
+            className="w-full mt-4 py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition"
+          >
+            Vezi toate badge-urile →
+          </button>
+        </Card>
+
+        {/* All-time Stats */}
+        <Card>
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-emerald-500" /> Statistici Totale
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-xl">
+              <div className="text-2xl font-bold text-slate-800 dark:text-white">{userData.stats?.totalWaterGlasses || 0}</div>
+              <div className="text-xs text-slate-500 dark:text-neutral-400">💧 Pahare de apă</div>
+            </div>
+            <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-xl">
+              <div className="text-2xl font-bold text-slate-800 dark:text-white">{userData.stats?.totalFocusMinutes || 0}</div>
+              <div className="text-xs text-slate-500 dark:text-neutral-400">🎯 Minute focus</div>
+            </div>
+            <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-xl">
+              <div className="text-2xl font-bold text-slate-800 dark:text-white">{(userData.sleepLog || []).length}</div>
+              <div className="text-xs text-slate-500 dark:text-neutral-400">😴 Nopți tracked</div>
+            </div>
+            <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-xl">
+              <div className="text-2xl font-bold text-slate-800 dark:text-white">{userData.challengesCompleted || 0}</div>
+              <div className="text-xs text-slate-500 dark:text-neutral-400">🏆 Provocări completate</div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  };
+
+  // --- Full Achievements View ---
+  const renderAchievements = () => {
+    const categories = [...new Set(achievementsList.map(a => a.category))];
+    
+    return (
+      <div className="space-y-6 animate-fade-in pb-24 md:pb-0">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">🏆 Badge-uri</h1>
+          <p className="text-slate-500 dark:text-neutral-400">
+            Deblocate: {(userData.unlockedAchievements || []).length} / {achievementsList.length}
+          </p>
+        </div>
+
+        {categories.map(cat => (
+          <Card key={cat} className="overflow-hidden">
+            <h3 className="font-bold text-slate-800 dark:text-white mb-4 capitalize">{cat}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {achievementsList.filter(a => a.category === cat).map(ach => {
+                const isUnlocked = (userData.unlockedAchievements || []).includes(ach.id);
+                return (
+                  <div 
+                    key={ach.id}
+                    className={`p-4 rounded-xl flex items-center gap-4 transition ${
+                      isUnlocked 
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' 
+                        : 'bg-slate-50 dark:bg-neutral-800 opacity-60'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-xl ${isUnlocked ? 'bg-amber-100 dark:bg-amber-900/50' : 'bg-slate-200 dark:bg-neutral-700'}`}>
+                      <ach.icon className={`w-6 h-6 ${isUnlocked ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-neutral-500'}`} />
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-bold ${isUnlocked ? 'text-amber-900 dark:text-amber-100' : 'text-slate-600 dark:text-neutral-400'}`}>
+                        {ach.name}
+                      </div>
+                      <div className="text-sm text-slate-500 dark:text-neutral-400">{ach.description}</div>
+                    </div>
+                    {isUnlocked ? (
+                      <CheckCircle className="w-6 h-6 text-amber-500" />
+                    ) : (
+                      <div className="text-xs text-slate-400 dark:text-neutral-500">+{ach.xp} XP</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
   // --- Auth Screen ---
   const renderAuthScreen = () => (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 font-sans relative overflow-hidden">
@@ -857,46 +1800,86 @@ export default function App() {
          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
          <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600 rounded-full blur-[80px] opacity-10 translate-y-1/2 -translate-x-1/2"></div>
          
-         <div className="relative z-10 p-8 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div>
-                <div className="flex items-center gap-4 mb-4">
-                    {['😞', '😐', '🙂', '🤩'].map((m, idx) => (
-                        <button key={idx} onClick={() => setMoodValue(idx)} className={`text-2xl hover:scale-125 transition ${userData.mood === idx ? 'scale-125 drop-shadow-glow' : 'opacity-50'}`}>{m}</button>
-                    ))}
+         <div className="relative z-10 p-6 md:p-8">
+            {/* Top row: Level badge + Streak */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`px-3 py-1.5 rounded-full bg-${levelInfo.color}-500/20 border border-${levelInfo.color}-500/50 flex items-center gap-2`}>
+                  <levelInfo.icon className={`w-4 h-4 text-${levelInfo.color}-400`} />
+                  <span className={`text-sm font-bold text-${levelInfo.color}-300`}>Nv. {currentLevel}</span>
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white">Salut, {userData.profile?.name || 'Oaspete'}!</h1>
-                
-                <div className="flex gap-3 mt-4 mb-6">
-                    <button onClick={() => setActiveOverlay('morning')} className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-amber-500/30 transition">
-                        <Sun className="w-4 h-4"/> Start Zi
-                    </button>
-                    <button onClick={() => setActiveOverlay('evening')} className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-500/30 transition">
-                        <Moon className="w-4 h-4"/> Închidere
-                    </button>
+                <span className="text-neutral-400 text-sm hidden md:block">{levelInfo.name}</span>
+              </div>
+              
+              {userData.currentStreak > 0 && (
+                <div className="flex items-center gap-2 bg-orange-500/20 px-3 py-1.5 rounded-full border border-orange-500/30">
+                  <Flame className="w-4 h-4 text-orange-400" />
+                  <span className="font-bold text-orange-300">{userData.currentStreak} zile</span>
                 </div>
+              )}
+            </div>
 
-                <div className="flex gap-4 flex-wrap">
-                    <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
-                        <Droplets className="w-4 h-4 text-blue-400"/>
-                        <span className="font-bold text-neutral-200">{userData.waterIntake} / {userData.waterGoal} ml</span>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex-1">
+                  {/* Mood selector that opens modal */}
+                  <button 
+                    onClick={() => setShowMoodModal(true)}
+                    className="flex items-center gap-3 mb-3 group"
+                  >
+                    <span className="text-3xl">{userData.mood !== null ? ['😞', '😐', '🙂', '🤩'][userData.mood] : '🤔'}</span>
+                    <span className="text-sm text-neutral-400 group-hover:text-white transition">
+                      {userData.mood !== null ? 'Schimbă starea' : 'Cum te simți?'}
+                    </span>
+                  </button>
+
+                  <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white">Salut, {userData.profile?.name || 'Oaspete'}!</h1>
+                  
+                  {/* XP Progress bar */}
+                  <div className="mb-4 max-w-md">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-neutral-400">{userData.xp || 0} XP</span>
+                      <span className="text-neutral-400">Nivel {currentLevel + 1}: {xpForNextLevel} XP</span>
                     </div>
-                    <div className="flex gap-2">
-                      {[250, 500].map(amt => (
-                        <button key={amt} onClick={() => addWater(amt)} className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-lg text-sm font-bold hover:bg-blue-500/30 transition">
-                          +{amt}ml
-                        </button>
-                      ))}
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-1000"
+                        style={{ width: `${xpProgress}%` }}
+                      />
                     </div>
-                    <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
-                        <Zap className="w-4 h-4 text-amber-400"/>
-                        <span className="font-bold text-neutral-200">{score} / 100 Puncte</span>
-                    </div>
-                </div>
-            </div>
-            <div className="relative">
-                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl font-bold text-white">{score}</span>
-                <CircularProgress score={score} size={32} />
-            </div>
+                  </div>
+                  
+                  <div className="flex gap-2 flex-wrap mb-4">
+                      <button onClick={() => setActiveOverlay('morning')} className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-amber-500/30 transition">
+                          <Sun className="w-4 h-4"/> Start Zi
+                      </button>
+                      <button onClick={() => setActiveOverlay('evening')} className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-500/30 transition">
+                          <Moon className="w-4 h-4"/> Închidere
+                      </button>
+                      <button onClick={() => setShowSleepModal(true)} className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-purple-500/30 transition">
+                          <Bed className="w-4 h-4"/> Somn
+                      </button>
+                  </div>
+
+                  <div className="flex gap-3 flex-wrap">
+                      <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-md">
+                          <Droplets className="w-4 h-4 text-blue-400"/>
+                          <span className="font-bold text-neutral-200">{userData.waterIntake} / {userData.waterGoal} ml</span>
+                      </div>
+                      <div className="flex gap-2">
+                        {[250, 500].map(amt => (
+                          <button key={amt} onClick={() => addWater(amt)} className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-lg text-sm font-bold hover:bg-blue-500/30 transition">
+                            +{amt}ml
+                          </button>
+                        ))}
+                      </div>
+                  </div>
+              </div>
+              <div className="relative flex-shrink-0">
+                  <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl font-bold text-white">{score}</span>
+                  <CircularProgress score={score} size={32} />
+                  <div className="text-center mt-2 text-xs text-neutral-400">Scor Zilnic</div>
+              </div>
+           </div>
          </div>
       </div>
 
@@ -1789,13 +2772,15 @@ export default function App() {
         <div className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto scrollbar-hide">
             {[
                 { id: 'dashboard', label: 'Dashboard', icon: Activity },
+                { id: 'stats', label: 'Statistici', icon: BarChart3 },
+                { id: 'achievements', label: 'Badge-uri', icon: Trophy },
                 { id: 'focus', label: 'Focus Zen', icon: Timer },
                 { id: 'nutrition', label: 'Nutriție AI', icon: Utensils },
                 { id: 'challenges', label: 'Provocări', icon: Flame },
                 { id: 'mindfulness', label: 'Minte & Suflet', icon: Smile },
                 { id: 'knowledge', label: 'Bibliotecă', icon: BookOpen },
-                { id: 'profile', label: 'Profilul Meu', icon: User },
                 { id: 'ai-coach', label: 'AI Coach', icon: Zap },
+                { id: 'profile', label: 'Profilul Meu', icon: User },
             ].map((item) => (
                 <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all duration-300 group ${activeTab === item.id ? 'bg-indigo-50 dark:bg-neutral-900 text-indigo-700 dark:text-indigo-400 font-bold shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:bg-slate-50 dark:hover:bg-neutral-900 hover:text-slate-900 dark:hover:text-neutral-200'}`}>
                     <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'stroke-[2.5px]' : ''}`} />
@@ -1809,7 +2794,7 @@ export default function App() {
       {/* Mobile Bottom Bar */}
       <nav className="md:hidden fixed bottom-0 w-full bg-white/90 dark:bg-black/90 backdrop-blur-lg border-t border-slate-200 dark:border-neutral-800 z-50 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.02)] transition-colors duration-300">
         <div className="flex justify-start overflow-x-auto p-2 gap-2 scrollbar-hide">
-            {[{ id: 'dashboard', icon: Activity }, { id: 'focus', icon: Timer }, { id: 'nutrition', icon: Utensils }, { id: 'challenges', icon: Flame }, { id: 'mindfulness', icon: Smile }, { id: 'ai-coach', icon: Zap }, { id: 'profile', icon: User }].map((item) => (
+            {[{ id: 'dashboard', icon: Activity }, { id: 'stats', icon: BarChart3 }, { id: 'focus', icon: Timer }, { id: 'nutrition', icon: Utensils }, { id: 'challenges', icon: Flame }, { id: 'mindfulness', icon: Smile }, { id: 'ai-coach', icon: Zap }, { id: 'profile', icon: User }].map((item) => (
                 <button key={item.id} onClick={() => setActiveTab(item.id)} className={`p-3 rounded-2xl flex-shrink-0 transition-all ${activeTab === item.id ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-neutral-900 scale-110' : 'text-slate-400 dark:text-neutral-500'}`}>
                     <item.icon className="w-6 h-6" />
                 </button>
@@ -1821,6 +2806,8 @@ export default function App() {
       <main className="flex-1 md:ml-20 lg:ml-64 p-4 md:p-8 min-h-screen bg-slate-50/50 dark:bg-black transition-colors duration-300">
         <div className="max-w-6xl mx-auto">
             {activeTab === 'dashboard' && renderDashboard()}
+            {activeTab === 'stats' && renderStats()}
+            {activeTab === 'achievements' && renderAchievements()}
             {activeTab === 'focus' && renderFocus()}
             {activeTab === 'nutrition' && renderNutrition()}
             {activeTab === 'challenges' && renderChallenges()}
@@ -1846,6 +2833,12 @@ export default function App() {
             </footer>
         </div>
       </main>
+
+      {/* Modals */}
+      {showOnboarding && renderOnboarding()}
+      {showSleepModal && renderSleepModal()}
+      {showMoodModal && renderMoodModal()}
+      {renderAchievementNotification()}
     </div>
   );
 }
