@@ -76,7 +76,6 @@ import {
   Briefcase,
   Baby,
   Users,
-  type as TypeIcon,
   Contrast,
   Bell,
   BellOff,
@@ -87,10 +86,7 @@ import {
   Gem,
   Shield,
   Rocket,
-  Swords,
-  FlameKindling,
-  Waves,
-  TreePine
+  TreeDeciduous
 } from 'lucide-react';
 
 // Firebase imports
@@ -309,7 +305,7 @@ const achievementsList = [
   
   // Hidratare
   { id: 'water_100', name: 'Hidratat', description: '100 pahare de apă', icon: Droplets, xp: 100, category: 'water' },
-  { id: 'water_500', name: 'Acvatic', description: '500 pahare de apă', icon: Waves, xp: 300, category: 'water' },
+  { id: 'water_500', name: 'Acvatic', description: '500 pahare de apă', icon: Droplets, xp: 300, category: 'water' },
   { id: 'water_streak_7', name: 'Flux Constant', description: '7 zile cu goal de apă atins', icon: Droplets, xp: 150, category: 'water' },
   
   // Somn
@@ -376,7 +372,7 @@ const moodFactors = [
   { id: 'work', label: 'Muncă grea', icon: Briefcase, negative: true },
   { id: 'health', label: 'Probleme sănătate', icon: Heart, negative: true },
   { id: 'exercise', label: 'Am făcut sport', icon: Dumbbell, negative: false },
-  { id: 'nature', label: 'Timp în natură', icon: TreePine, negative: false },
+  { id: 'nature', label: 'Timp în natură', icon: TreeDeciduous, negative: false },
   { id: 'social', label: 'Socializare', icon: Users, negative: false },
   { id: 'achievement', label: 'Am realizat ceva', icon: Trophy, negative: false },
   { id: 'good_food', label: 'Am mâncat sănătos', icon: Salad, negative: false },
@@ -418,14 +414,14 @@ const CircularProgress = ({ score, size = 24 }) => {
 };
 
 // Mini bar chart component for stats
-const MiniBarChart = ({ data, height = 60, color = 'indigo' }) => {
+const MiniBarChart = ({ data, height = 60 }) => {
   const max = Math.max(...data.map(d => d.value), 1);
   return (
     <div className="flex items-end gap-1" style={{ height }}>
       {data.map((d, i) => (
         <div key={i} className="flex-1 flex flex-col items-center gap-1">
           <div 
-            className={`w-full bg-${color}-500 dark:bg-${color}-600 rounded-t transition-all duration-500`}
+            className="w-full bg-indigo-500 dark:bg-indigo-600 rounded-t transition-all duration-500"
             style={{ height: `${(d.value / max) * 100}%`, minHeight: d.value > 0 ? 4 : 0 }}
           />
           <span className="text-[10px] text-slate-400 dark:text-neutral-500">{d.label}</span>
@@ -602,6 +598,14 @@ export default function App() {
   
   // Stats period
   const [statsPeriod, setStatsPeriod] = useState('week'); // week, month, all
+
+  // Onboarding selections
+  const [onboardingSelections, setOnboardingSelections] = useState({
+    primaryGoal: null,
+    userType: null,
+    dailyTimeAvailable: null,
+    experienceLevel: null,
+  });
 
   // Computed values
   const currentLevel = useMemo(() => levelSystem.getLevel(userData.xp || 0), [userData.xp]);
@@ -1201,13 +1205,6 @@ export default function App() {
       }
     ];
 
-    const [selections, setSelections] = useState({
-      primaryGoal: null,
-      userType: null,
-      dailyTimeAvailable: null,
-      experienceLevel: null,
-    });
-
     const stepKeys = ['primaryGoal', 'userType', 'dailyTimeAvailable', 'experienceLevel'];
 
     return (
@@ -1230,22 +1227,23 @@ export default function App() {
                 <button
                   key={opt.id}
                   onClick={() => {
-                    setSelections(prev => ({ ...prev, [stepKeys[onboardingStep]]: opt.id }));
+                    const newSelections = { ...onboardingSelections, [stepKeys[onboardingStep]]: opt.id };
+                    setOnboardingSelections(newSelections);
                     
                     if (onboardingStep < steps.length - 1) {
                       setTimeout(() => setOnboardingStep(s => s + 1), 300);
                     } else {
-                      completeOnboarding({ ...selections, [stepKeys[onboardingStep]]: opt.id });
+                      completeOnboarding(newSelections);
                     }
                   }}
                   className={`w-full p-4 rounded-xl border transition-all flex items-center gap-4 ${
-                    selections[stepKeys[onboardingStep]] === opt.id
-                      ? `bg-${opt.color}-500/20 border-${opt.color}-500 text-white`
+                    onboardingSelections[stepKeys[onboardingStep]] === opt.id
+                      ? 'bg-indigo-500/20 border-indigo-500 text-white'
                       : 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:border-neutral-600'
                   }`}
                 >
-                  <div className={`p-3 rounded-xl bg-${opt.color}-500/20`}>
-                    <opt.icon className={`w-6 h-6 text-${opt.color}-400`} />
+                  <div className="p-3 rounded-xl bg-indigo-500/20">
+                    <opt.icon className="w-6 h-6 text-indigo-400" />
                   </div>
                   <div className="text-left flex-1">
                     <div className="font-bold">{opt.label || opt.name}</div>
@@ -1373,22 +1371,22 @@ export default function App() {
         <div className="space-y-6">
           <div className="flex justify-between gap-3">
             {[
-              { id: 0, emoji: '😞', label: 'Rău', color: 'rose' },
-              { id: 1, emoji: '😐', label: 'Meh', color: 'slate' },
-              { id: 2, emoji: '🙂', label: 'Bine', color: 'blue' },
-              { id: 3, emoji: '🤩', label: 'Super!', color: 'emerald' },
+              { id: 0, emoji: '😞', label: 'Rău', bgClass: 'bg-rose-500/20', borderClass: 'border-rose-500', textClass: 'text-rose-400' },
+              { id: 1, emoji: '😐', label: 'Meh', bgClass: 'bg-slate-500/20', borderClass: 'border-slate-500', textClass: 'text-slate-400' },
+              { id: 2, emoji: '🙂', label: 'Bine', bgClass: 'bg-blue-500/20', borderClass: 'border-blue-500', textClass: 'text-blue-400' },
+              { id: 3, emoji: '🤩', label: 'Super!', bgClass: 'bg-emerald-500/20', borderClass: 'border-emerald-500', textClass: 'text-emerald-400' },
             ].map((m) => (
               <button
                 key={m.id}
                 onClick={() => setMoodEntry(prev => ({ ...prev, mood: m.id }))}
                 className={`flex-1 py-4 rounded-xl transition flex flex-col items-center gap-2 ${
                   moodEntry.mood === m.id 
-                    ? `bg-${m.color}-500/20 border-2 border-${m.color}-500` 
+                    ? `${m.bgClass} border-2 ${m.borderClass}` 
                     : 'bg-neutral-800 border-2 border-transparent'
                 }`}
               >
                 <span className="text-3xl">{m.emoji}</span>
-                <span className={`text-xs font-medium ${moodEntry.mood === m.id ? `text-${m.color}-400` : 'text-neutral-400'}`}>
+                <span className={`text-xs font-medium ${moodEntry.mood === m.id ? m.textClass : 'text-neutral-400'}`}>
                   {m.label}
                 </span>
               </button>
@@ -1804,9 +1802,9 @@ export default function App() {
             {/* Top row: Level badge + Streak */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className={`px-3 py-1.5 rounded-full bg-${levelInfo.color}-500/20 border border-${levelInfo.color}-500/50 flex items-center gap-2`}>
-                  <levelInfo.icon className={`w-4 h-4 text-${levelInfo.color}-400`} />
-                  <span className={`text-sm font-bold text-${levelInfo.color}-300`}>Nv. {currentLevel}</span>
+                <div className="px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-500/50 flex items-center gap-2">
+                  <levelInfo.icon className="w-4 h-4 text-indigo-400" />
+                  <span className="text-sm font-bold text-indigo-300">Nv. {currentLevel}</span>
                 </div>
                 <span className="text-neutral-400 text-sm hidden md:block">{levelInfo.name}</span>
               </div>
@@ -1966,31 +1964,71 @@ export default function App() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  {[
-                        { id: 'sleep', label: 'Somn 7-8h', sub: 'Refacere Neurală', icon: Moon, color: 'indigo' },
-                        { id: 'nature', label: 'Lumină Solară', sub: 'Setare Circadiană', icon: Sun, color: 'amber' },
-                        { id: 'reading', label: 'Deep Work', sub: 'Focus 45 min', icon: BookOpen, color: 'emerald' },
-                        { id: 'alcohol', label: 'Zero Toxine', sub: 'Fără Alcool', icon: Wine, color: 'rose' },
-                        { id: 'water', label: 'Hidratare 2.5L', sub: 'Funcție Cognitivă', icon: Droplets, color: 'blue' },
-                        { id: 'movement', label: 'Mișcare 30min', sub: 'Activare Metabolică', icon: Activity, color: 'orange' },
-                        { id: 'meditation', label: 'Meditație', sub: 'Mindfulness 10min', icon: Brain, color: 'purple' },
-                        { id: 'coldexposure', label: 'Expunere Frig', sub: 'Duș Rece 2min', icon: Snowflake, color: 'cyan' },
-                        { id: 'journaling', label: 'Jurnal', sub: 'Reflecție Zilnică', icon: PenTool, color: 'pink' },
-                        { id: 'noscreen', label: 'Digital Detox', sub: 'Fără Ecrane 1h', icon: EyeOff, color: 'slate' },
+                        { id: 'sleep', label: 'Somn 7-8h', sub: 'Refacere Neurală', icon: Moon, 
+                          activeBg: 'bg-indigo-50 dark:bg-neutral-900 border-indigo-200 dark:border-indigo-900/50 shadow-sm',
+                          activeIcon: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400',
+                          activeText: 'text-indigo-900 dark:text-indigo-100',
+                          checkColor: 'text-indigo-500' },
+                        { id: 'nature', label: 'Lumină Solară', sub: 'Setare Circadiană', icon: Sun,
+                          activeBg: 'bg-amber-50 dark:bg-neutral-900 border-amber-200 dark:border-amber-900/50 shadow-sm',
+                          activeIcon: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
+                          activeText: 'text-amber-900 dark:text-amber-100',
+                          checkColor: 'text-amber-500' },
+                        { id: 'reading', label: 'Deep Work', sub: 'Focus 45 min', icon: BookOpen,
+                          activeBg: 'bg-emerald-50 dark:bg-neutral-900 border-emerald-200 dark:border-emerald-900/50 shadow-sm',
+                          activeIcon: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
+                          activeText: 'text-emerald-900 dark:text-emerald-100',
+                          checkColor: 'text-emerald-500' },
+                        { id: 'alcohol', label: 'Zero Toxine', sub: 'Fără Alcool', icon: Wine,
+                          activeBg: 'bg-rose-50 dark:bg-neutral-900 border-rose-200 dark:border-rose-900/50 shadow-sm',
+                          activeIcon: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400',
+                          activeText: 'text-rose-900 dark:text-rose-100',
+                          checkColor: 'text-rose-500' },
+                        { id: 'water', label: 'Hidratare 2.5L', sub: 'Funcție Cognitivă', icon: Droplets,
+                          activeBg: 'bg-blue-50 dark:bg-neutral-900 border-blue-200 dark:border-blue-900/50 shadow-sm',
+                          activeIcon: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+                          activeText: 'text-blue-900 dark:text-blue-100',
+                          checkColor: 'text-blue-500' },
+                        { id: 'movement', label: 'Mișcare 30min', sub: 'Activare Metabolică', icon: Activity,
+                          activeBg: 'bg-orange-50 dark:bg-neutral-900 border-orange-200 dark:border-orange-900/50 shadow-sm',
+                          activeIcon: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+                          activeText: 'text-orange-900 dark:text-orange-100',
+                          checkColor: 'text-orange-500' },
+                        { id: 'meditation', label: 'Meditație', sub: 'Mindfulness 10min', icon: Brain,
+                          activeBg: 'bg-purple-50 dark:bg-neutral-900 border-purple-200 dark:border-purple-900/50 shadow-sm',
+                          activeIcon: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+                          activeText: 'text-purple-900 dark:text-purple-100',
+                          checkColor: 'text-purple-500' },
+                        { id: 'coldexposure', label: 'Expunere Frig', sub: 'Duș Rece 2min', icon: Snowflake,
+                          activeBg: 'bg-cyan-50 dark:bg-neutral-900 border-cyan-200 dark:border-cyan-900/50 shadow-sm',
+                          activeIcon: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400',
+                          activeText: 'text-cyan-900 dark:text-cyan-100',
+                          checkColor: 'text-cyan-500' },
+                        { id: 'journaling', label: 'Jurnal', sub: 'Reflecție Zilnică', icon: PenTool,
+                          activeBg: 'bg-pink-50 dark:bg-neutral-900 border-pink-200 dark:border-pink-900/50 shadow-sm',
+                          activeIcon: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400',
+                          activeText: 'text-pink-900 dark:text-pink-100',
+                          checkColor: 'text-pink-500' },
+                        { id: 'noscreen', label: 'Digital Detox', sub: 'Fără Ecrane 1h', icon: EyeOff,
+                          activeBg: 'bg-slate-50 dark:bg-neutral-900 border-slate-200 dark:border-slate-900/50 shadow-sm',
+                          activeIcon: 'bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-400',
+                          activeText: 'text-slate-900 dark:text-slate-100',
+                          checkColor: 'text-slate-500' },
                  ].map(item => (
                     <div key={item.id} onClick={() => toggleHabit(item.id)} 
                         className={`p-4 rounded-2xl border flex items-center gap-4 cursor-pointer transition-all hover:scale-[1.02] ${
                         userData.dailyHabits[item.id] 
-                        ? `bg-${item.color}-50 dark:bg-neutral-900 border-${item.color}-200 dark:border-${item.color}-900/50 shadow-sm` 
+                        ? item.activeBg 
                         : 'bg-white dark:bg-neutral-950 border-slate-100 dark:border-neutral-800 hover:shadow-md dark:hover:border-neutral-700'
                         }`}>
-                        <div className={`p-3 rounded-xl ${userData.dailyHabits[item.id] ? `bg-${item.color}-100 dark:bg-${item.color}-900/30 text-${item.color}-700 dark:text-${item.color}-400` : 'bg-slate-50 dark:bg-neutral-900 text-slate-400 dark:text-neutral-500'}`}>
+                        <div className={`p-3 rounded-xl ${userData.dailyHabits[item.id] ? item.activeIcon : 'bg-slate-50 dark:bg-neutral-900 text-slate-400 dark:text-neutral-500'}`}>
                             <item.icon className="w-6 h-6"/>
                         </div>
                         <div className="flex-1">
-                            <div className={`font-bold ${userData.dailyHabits[item.id] ? `text-${item.color}-900 dark:text-${item.color}-100` : 'text-slate-700 dark:text-neutral-300'}`}>{item.label}</div>
+                            <div className={`font-bold ${userData.dailyHabits[item.id] ? item.activeText : 'text-slate-700 dark:text-neutral-300'}`}>{item.label}</div>
                             <div className="text-xs text-slate-400 dark:text-neutral-500 uppercase tracking-wide font-medium">{item.sub}</div>
                         </div>
-                        {userData.dailyHabits[item.id] && <CheckCircle className={`w-6 h-6 text-${item.color}-500 animate-bounce-in`}/>}
+                        {userData.dailyHabits[item.id] && <CheckCircle className={`w-6 h-6 ${item.checkColor} animate-bounce-in`}/>}
                     </div>
                  ))}
             </div>
